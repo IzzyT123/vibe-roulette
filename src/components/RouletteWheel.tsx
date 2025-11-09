@@ -248,11 +248,11 @@ export function RouletteWheel({ onSpin, disabled = false }: RouletteWheelProps) 
         </motion.div>
         
         {/* Pointer/Arrow at top - SVG path matching Figma design */}
-        <motion.div 
+        <motion.div
           className="absolute -top-4 z-20 pointer-events-none"
           style={{
             left: '50%',
-            transform: 'translateX(-60%)', // Shift left more to align with segment boundary
+            transform: 'translateX(-50%)', // Center the arrow perfectly in the middle
             filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
           }}
           animate={{
