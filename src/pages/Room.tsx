@@ -988,14 +988,15 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
               onCodeChange={(code) => {
                 // Skip if AI is generating (prevents loop)
                 if (isAIGeneratingRef.current) {
+                  console.log('Skipping onCodeChange - AI generating');
                   return;
                 }
-                
+
                 setCurrentCode(code);
-                
+
                 // Emit typing indicator
                 updateTypingStatus(room.id, true);
-                
+
                 // Debounce typing indicator clear
                 if (typingTimeoutRef.current) {
                   clearTimeout(typingTimeoutRef.current);
@@ -1003,17 +1004,17 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                 typingTimeoutRef.current = setTimeout(() => {
                   updateTypingStatus(room.id, false);
                 }, 1000);
-                
+
                 // Save to virtual file system (local changes, visible in editor)
                 vfs.setFile(activeTab, code);
-                
+
                 // Update local preview immediately (real-time editing experience)
                 setAllFiles(prevFiles => {
                   const newFiles = new Map(prevFiles);
                   newFiles.set(activeTab, code);
                   return newFiles;
                 });
-                
+
                 // Debounced sync to Supabase (for remote user to see changes)
                 // This will trigger real-time update for the other user
               }}

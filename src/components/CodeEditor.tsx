@@ -58,6 +58,7 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const hasConfiguredMonaco = useRef(false);
   const partnerCursorDecorationsRef = useRef<string[]>([]);
+  const isProgrammaticUpdateRef = useRef(false);
   
   // Render partner cursor decorations
   const renderPartnerCursor = (line: number, column: number, partnerRole?: string) => {
@@ -105,7 +106,14 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
         console.log('CodeEditor: Setting code for', filePath, 'length:', currentCode.length);
         setCode(currentCode);
         if (editorRef.current) {
+          // Set flag to prevent onChange callback during programmatic update
+          isProgrammaticUpdateRef.current = true;
           editorRef.current.setValue(currentCode);
+
+          // Clear flag after a short delay
+          setTimeout(() => {
+            isProgrammaticUpdateRef.current = false;
+          }, 10);
         }
       } else {
         console.warn('CodeEditor: No code content for', filePath);
@@ -120,7 +128,15 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
       if (currentCode !== editorValue) {
         console.log('CodeEditor: Updating code content for', currentFile);
         setCode(currentCode);
+
+        // Set flag to prevent onChange callback during programmatic update
+        isProgrammaticUpdateRef.current = true;
         editorRef.current.setValue(currentCode);
+
+        // Clear flag after a short delay (Monaco fires onChange asynchronously)
+        setTimeout(() => {
+          isProgrammaticUpdateRef.current = false;
+        }, 10);
       }
     }
   }, [currentCode, filePath, currentFile]);
@@ -129,12 +145,21 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
   useEffect(() => {
     if (aiGeneratedCode && editorRef.current) {
       setCode(aiGeneratedCode);
+
+      // Set flag to prevent onChange callback during programmatic update
+      isProgrammaticUpdateRef.current = true;
       editorRef.current.setValue(aiGeneratedCode);
+
+      // Clear flag after a short delay
+      setTimeout(() => {
+        isProgrammaticUpdateRef.current = false;
+      }, 10);
+
       setShowAIIndicator(true);
       setTimeout(() => setShowAIIndicator(false), 2000);
-      onCodeChange?.(aiGeneratedCode);
+      // Don't call onCodeChange here - it will be handled by the AI generation flow in Room.tsx
     }
-  }, [aiGeneratedCode, onCodeChange]);
+  }, [aiGeneratedCode]);
   
   // Expose render function for partner cursor (will be called by parent)
   useEffect(() => {
@@ -264,6 +289,12 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
   const handleCodeChange = (value: string | undefined) => {
     const newCode = value || '';
     setCode(newCode);
+
+    // Skip onCodeChange callback if this is a programmatic update
+    if (isProgrammaticUpdateRef.current) {
+      return;
+    }
+
     onCodeChange?.(newCode);
   };
 
