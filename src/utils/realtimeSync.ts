@@ -14,6 +14,7 @@ export interface ChatMessage {
   sessionId: string;
   userId: string;
   message: string;
+  role?: 'user' | 'assistant'; // Optional for backwards compatibility
   createdAt: string;
 }
 
@@ -211,11 +212,12 @@ export function subscribeToSessionChat(
 }
 
 /**
- * Send a chat message
+ * Send a chat message with role (user or assistant)
  */
 export async function sendChatMessage(
   sessionId: string,
-  message: string
+  message: string,
+  role: 'user' | 'assistant' = 'user'
 ): Promise<void> {
   const userId = getCurrentUserId();
   if (!userId) {
@@ -231,6 +233,7 @@ export async function sendChatMessage(
     session_id: sessionId,
     user_id: userId,
     message: message,
+    role: role,
   });
 
   if (error) {
@@ -263,6 +266,7 @@ export async function getSessionChatHistory(sessionId: string): Promise<ChatMess
     sessionId: msg.session_id,
     userId: msg.user_id,
     message: msg.message,
+    role: msg.role || 'user', // Default to 'user' for backwards compatibility
     createdAt: msg.created_at,
   })) as ChatMessage[];
 }

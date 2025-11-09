@@ -165,11 +165,10 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
 
         // Load chat history from Supabase
         const chatHistory = await getSessionChatHistory(room.id);
-        const userId = getCurrentUserId();
         if (chatHistory.length > 0) {
           const messages: ChatMessage[] = chatHistory.map((msg) => ({
             id: msg.id,
-            role: msg.userId === userId ? 'user' : 'assistant',
+            role: msg.role || 'user', // Use role from database, default to 'user'
             content: msg.message,
             timestamp: new Date(msg.createdAt),
           }));
@@ -235,14 +234,14 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   useEffect(() => {
     const unsubscribeChat = subscribeToSessionChat(room.id, (message) => {
       const userId = getCurrentUserId();
-      // Don't add our own messages (they're already added)
+      // Don't add our own messages (they're already added locally)
       if (message.userId === userId) {
         return;
       }
 
       const chatMessage: ChatMessage = {
         id: message.id,
-        role: 'assistant',
+        role: message.role || 'user', // Use role from database, default to 'user' for backwards compatibility
         content: message.message,
         timestamp: new Date(message.createdAt),
       };

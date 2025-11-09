@@ -128,6 +128,15 @@ export function AIChatPanel({
 
           setMessages(prev => [...prev, assistantMessage]);
           
+          // Sync assistant response to Supabase with 'assistant' role
+          if (sessionId) {
+            try {
+              await sendChatMessage(sessionId, assistantMessage.content, 'assistant');
+            } catch (error) {
+              console.error('Error sending assistant message:', error);
+            }
+          }
+          
           // Notify parent to create all files
           if (onProjectGenerated) {
             onProjectGenerated(multiFileProject);
@@ -143,6 +152,15 @@ export function AIChatPanel({
           };
 
           setMessages(prev => [...prev, assistantMessage]);
+          
+          // Sync assistant response to Supabase with 'assistant' role
+          if (sessionId) {
+            try {
+              await sendChatMessage(sessionId, assistantMessage.content, 'assistant');
+            } catch (error) {
+              console.error('Error sending assistant message:', error);
+            }
+          }
           
           // Auto-insert code into editor immediately
           if (onCodeGenerated) {
@@ -160,6 +178,15 @@ export function AIChatPanel({
         };
 
         setMessages(prev => [...prev, assistantMessage]);
+        
+        // Sync assistant response to Supabase
+        if (sessionId) {
+          try {
+            await sendChatMessage(sessionId, assistantMessage.content);
+          } catch (error) {
+            console.error('Error sending assistant message:', error);
+          }
+        }
       }
     } catch (error) {
       console.error('AI Error:', error);
@@ -170,6 +197,15 @@ export function AIChatPanel({
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Sync error message to Supabase with 'assistant' role
+      if (sessionId) {
+        try {
+          await sendChatMessage(sessionId, errorMessage.content, 'assistant');
+        } catch (err) {
+          console.error('Error sending error message:', err);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
