@@ -22,6 +22,30 @@ type FileChangeCallback = (change: FileChange) => void;
 type ChatMessageCallback = (message: ChatMessage) => void;
 type TypingStatusCallback = (userId: string, isTyping: boolean) => void;
 type CodeApprovalCallback = (approval: CodeApproval) => void;
+type CursorPositionCallback = (position: CursorPosition) => void;
+type ActivityCallback = (activity: SessionActivity) => void;
+
+export interface SessionActivity {
+  id: string;
+  sessionId: string;
+  userId: string;
+  actionType: 'file_opened' | 'file_saved' | 'file_created' | 'ai_request' | 'code_generated' | 'error_fixed' | 'tab_switched';
+  actionData?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface CursorPosition {
+  sessionId: string;
+  userId: string;
+  filePath: string;
+  lineNumber: number;
+  columnNumber: number;
+  selectionStartLine?: number;
+  selectionStartColumn?: number;
+  selectionEndLine?: number;
+  selectionEndColumn?: number;
+  updatedAt: string;
+}
 
 export interface CodeApproval {
   id: string;
@@ -528,5 +552,189 @@ export async function getPendingApprovals(sessionId: string): Promise<CodeApprov
     status: item.status,
     createdAt: item.created_at,
   })) as CodeApproval[];
+}
+
+/**
+ * Update cursor position for collaborative editing
+ */
+export async function updateCursorPosition(
+  sessionId: string,
+  filePath: string,
+  lineNumber: number,
+  columnNumber: number,
+  selection?: {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+  }
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId || !isSupabaseConfigured()) return;
+
+  const { error } = await supabase
+    .from('cursor_positions')
+    .upsert(
+      {
+        session_id: sessionId,
+        user_id: userId,
+        file_path: filePath,
+        line_number: lineNumber,
+        column_number: columnNumber,
+        selection_start_line: selection?.startLine,
+        selection_start_column: selection?.startColumn,
+        selection_end_line: selection?.endLine,
+        selection_end_column: selection?.endColumn,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'session_id,user_id',
+      }
+    );
+
+  if (error) {
+    console.error('Error updating cursor position:', error);
+  }
+}
+
+/**
+ * Subscribe to cursor position changes
+ */
+export function subscribeToCursorPositions(
+  sessionId: string,
+  callback: CursorPositionCallback
+): () => void {
+  if (!isSupabaseConfigured()) {
+    return () => {};
+  }
+
+  const channel = supabase
+    .channel(`cursors:${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'cursor_positions',
+        filter: `session_id=eq.${sessionId}`,
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const data = payload.new as any;
+          const position: CursorPosition = {
+            sessionId: data.session_id,
+            userId: data.user_id,
+            filePath: data.file_path,
+            lineNumber: data.line_number,
+            columnNumber: data.column_number,
+            selectionStartLine: data.selection_start_line,
+            selectionStartColumn: data.selection_start_column,
+            selectionEndLine: data.selection_end_line,
+            selectionEndColumn: data.selection_end_column,
+            updatedAt: data.updated_at,
+          };
+          callback(position);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Log an activity action
+ */
+export async function logActivity(
+  sessionId: string,
+  actionType: SessionActivity['actionType'],
+  actionData?: Record<string, any>
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId || !isSupabaseConfigured()) return;
+
+  const { error } = await supabase.from('session_activity').insert({
+    session_id: sessionId,
+    user_id: userId,
+    action_type: actionType,
+    action_data: actionData || null,
+  });
+
+  if (error) {
+    console.error('Error logging activity:', error);
+  }
+}
+
+/**
+ * Subscribe to session activity
+ */
+export function subscribeToActivity(
+  sessionId: string,
+  callback: ActivityCallback
+): () => void {
+  if (!isSupabaseConfigured()) {
+    return () => {};
+  }
+
+  const channel = supabase
+    .channel(`activity:${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'session_activity',
+        filter: `session_id=eq.${sessionId}`,
+      },
+      (payload) => {
+        const data = payload.new as any;
+        const activity: SessionActivity = {
+          id: data.id,
+          sessionId: data.session_id,
+          userId: data.user_id,
+          actionType: data.action_type,
+          actionData: data.action_data,
+          createdAt: data.created_at,
+        };
+        callback(activity);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Get session activity history
+ */
+export async function getSessionActivity(sessionId: string, limit = 50): Promise<SessionActivity[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('session_activity')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching activity:', error);
+    return [];
+  }
+
+  return (data || []).map((item) => ({
+    id: item.id,
+    sessionId: item.session_id,
+    userId: item.user_id,
+    actionType: item.action_type,
+    actionData: item.action_data,
+    createdAt: item.created_at,
+  })) as SessionActivity[];
 }
 

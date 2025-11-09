@@ -11,6 +11,7 @@ interface CodeEditorProps {
   currentCode?: string;
   onCodeChange?: (code: string) => void;
   aiGeneratedCode?: string;
+  onCursorMove?: (line: number, column: number) => void;
 }
 
 const STARTER_CODE = `import { useState } from 'react';
@@ -48,13 +49,51 @@ export default function App() {
   );
 }`;
 
-export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGeneratedCode }: CodeEditorProps) {
+export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGeneratedCode, onCursorMove, roomId }: CodeEditorProps) {
   const [code, setCode] = useState(currentCode || STARTER_CODE);
   const [showAIIndicator, setShowAIIndicator] = useState(false);
   const [isMinimapEnabled, setIsMinimapEnabled] = useState(true);
   const [currentFile, setCurrentFile] = useState(filePath || '/src/App.tsx');
+  const [partnerCursorPosition, setPartnerCursorPosition] = useState<{ line: number; column: number } | null>(null);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const hasConfiguredMonaco = useRef(false);
+  const partnerCursorDecorationsRef = useRef<string[]>([]);
+  
+  // Render partner cursor decorations
+  const renderPartnerCursor = (line: number, column: number, partnerRole?: string) => {
+    if (!editorRef.current) return;
+    
+    const editor = editorRef.current;
+    const cursorColor = partnerRole === 'Driver' ? '#FF6A00' : '#B16BFF'; // Orange or Purple
+    
+    // Clear old decorations
+    if (partnerCursorDecorationsRef.current.length > 0) {
+      partnerCursorDecorationsRef.current = editor.deltaDecorations(
+        partnerCursorDecorationsRef.current,
+        []
+      );
+    }
+    
+    // Add new cursor decoration
+    partnerCursorDecorationsRef.current = editor.deltaDecorations(
+      [],
+      [
+        {
+          range: new (window as any).monaco.Range(line, column, line, column + 1),
+          options: {
+            className: 'partner-cursor',
+            beforeContentClassName: 'partner-cursor-line',
+            before: {
+              content: '▍',
+              inlineClassName: 'partner-cursor-indicator',
+              inlineClassNameAffectsLetterSpacing: false,
+            },
+            stickiness: 1,
+          },
+        },
+      ]
+    );
+  };
 
   // Update editor when file path changes - force reload
   useEffect(() => {
@@ -96,6 +135,13 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
       onCodeChange?.(aiGeneratedCode);
     }
   }, [aiGeneratedCode, onCodeChange]);
+  
+  // Expose render function for partner cursor (will be called by parent)
+  useEffect(() => {
+    if (partnerCursorPosition && editorRef.current) {
+      renderPartnerCursor(partnerCursorPosition.line, partnerCursorPosition.column, role === 'Driver' ? 'Navigator' : 'Driver');
+    }
+  }, [partnerCursorPosition, role]);
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -193,6 +239,25 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
       suggestOnTriggerCharacters: true,
       quickSuggestions: true,
       wordBasedSuggestions: 'off',
+    });
+    
+    // Track cursor position changes (debounced)
+    let cursorTimeout: NodeJS.Timeout | null = null;
+    editor.onDidChangeCursorPosition((e) => {
+      if (cursorTimeout) clearTimeout(cursorTimeout);
+      cursorTimeout = setTimeout(() => {
+        const position = e.position;
+        const selection = editor.getSelection();
+        onCursorMove?.(position.lineNumber, position.column);
+        
+        // Emit cursor position with selection if any
+        if (selection && !selection.isEmpty()) {
+          // Has selection
+          const start = selection.getStartPosition();
+          const end = selection.getEndPosition();
+          // Will be handled by parent component to sync
+        }
+      }, 100); // Debounce 100ms
     });
   };
 
@@ -405,6 +470,27 @@ export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGenera
           <span>{code.length} chars</span>
         </div>
       </div>
+      
+      {/* Partner cursor styling */}
+      <style>{`
+        .partner-cursor {
+          animation: partner-cursor-blink 1s infinite;
+        }
+        .partner-cursor-indicator {
+          color: ${role === 'Driver' ? '#B16BFF' : '#FF6A00'} !important;
+          font-weight: bold;
+          text-shadow: 0 0 8px ${role === 'Driver' ? '#B16BFF' : '#FF6A00'};
+          animation: partner-cursor-pulse 1.5s infinite;
+        }
+        @keyframes partner-cursor-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0.3; }
+        }
+        @keyframes partner-cursor-pulse {
+          0%, 100% { text-shadow: 0 0 8px ${role === 'Driver' ? '#B16BFF' : '#FF6A00'}; }
+          50% { text-shadow: 0 0 16px ${role === 'Driver' ? '#B16BFF' : '#FF6A00'}, 0 0 24px ${role === 'Driver' ? '#B16BFF80' : '#FF6A0080'}; }
+        }
+      `}</style>
     </div>
   );
 }

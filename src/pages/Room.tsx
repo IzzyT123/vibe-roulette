@@ -12,7 +12,11 @@ import { FileTree } from '../components/FileTree';
 import { EditorTabs, EditorTab } from '../components/EditorTabs';
 import { UserProfile } from '../components/UserProfile';
 import { CodeApprovalModal } from '../components/CodeApprovalModal';
+import { ActivityFeed, type Activity } from '../components/ActivityFeed';
+import { SessionStats } from '../components/SessionStats';
+import { RoleBadge } from '../components/RoleBadge';
 import { vfs } from '../utils/virtualFileSystem';
+import { soundEffects } from '../utils/soundEffects';
 import { aiService } from '../utils/aiService';
 import { 
   subscribeToSessionFiles, 
@@ -28,7 +32,14 @@ import {
   rejectCodeChange,
   subscribeToCodeApprovals,
   getPendingApprovals,
-  type CodeApproval
+  updateCursorPosition,
+  subscribeToCursorPositions,
+  logActivity,
+  subscribeToActivity,
+  getSessionActivity,
+  type CodeApproval,
+  type CursorPosition,
+  type SessionActivity
 } from '../utils/realtimeSync';
 import { getCurrentUserId } from '../utils/auth';
 import { leaveSession } from '../utils/sessionService';
@@ -52,7 +63,8 @@ import {
   FolderPlus,
   Download,
   Users,
-  LogOut
+  LogOut,
+  Clock
 } from 'lucide-react';
 import type { Room as RoomType } from '../types/contracts';
 
@@ -146,14 +158,23 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const [activeTab, setActiveTab] = useState('/src/App.tsx');
   const [showLeftSidebar, setShowLeftSidebar] = useState(true);
   const [showRightSidebar, setShowRightSidebar] = useState(true);
-  const [activeLeftPanel, setActiveLeftPanel] = useState<'files' | 'constraints'>('files');
+  const [activeLeftPanel, setActiveLeftPanel] = useState<'files' | 'constraints' | 'activity'>('files');
   const [activeRightPanel, setActiveRightPanel] = useState<'preview' | 'ai'>('preview');
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [sessionStartTime] = useState(Date.now());
+  const [linesWritten, setLinesWritten] = useState(0);
+  const [filesCreatedCount, setFilesCreatedCount] = useState(0);
+  const [aiRequestsCount, setAIRequestsCount] = useState(0);
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(soundEffects.isEnabled());
   
   // Typing indicator and code approval state
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<CodeApproval | null>(null);
   const [approvedCode, setApprovedCode] = useState<Map<string, string>>(new Map());
+  const [partnerCursor, setPartnerCursor] = useState<CursorPosition | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const approvalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastApprovalChangeId = useRef<string | null>(null);
@@ -298,6 +319,84 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       unsubscribeTyping();
     };
   }, [room.id]);
+  
+  // Subscribe to partner cursor positions
+  useEffect(() => {
+    const unsubscribeCursors = subscribeToCursorPositions(room.id, (position) => {
+      const currentUserId = getCurrentUserId();
+      // Only show cursor for partner, not self
+      if (position.userId !== currentUserId && position.filePath === activeTab) {
+        setPartnerCursor(position);
+      }
+    });
+
+    return () => {
+      unsubscribeCursors();
+    };
+  }, [room.id, activeTab]);
+  
+  // Subscribe to activity feed
+  useEffect(() => {
+    const loadActivities = async () => {
+      const history = await getSessionActivity(room.id);
+      const currentUserId = getCurrentUserId();
+      const activityList: Activity[] = history.reverse().map((act) => ({
+        id: act.id,
+        userId: act.userId,
+        actionType: act.actionType,
+        actionData: act.actionData,
+        timestamp: new Date(act.createdAt),
+        isCurrentUser: act.userId === currentUserId,
+      }));
+      setActivities(activityList);
+      
+      // Calculate initial stats from history
+      const filesCreated = activityList.filter(a => a.actionType === 'file_created').length;
+      const aiRequests = activityList.filter(a => a.actionType === 'ai_request').length;
+      setFilesCreatedCount(filesCreated);
+      setAIRequestsCount(aiRequests);
+    };
+
+    loadActivities();
+
+    const unsubscribeActivity = subscribeToActivity(room.id, (activity) => {
+      const currentUserId = getCurrentUserId();
+      const newActivity: Activity = {
+        id: activity.id,
+        userId: activity.userId,
+        actionType: activity.actionType,
+        actionData: activity.actionData,
+        timestamp: new Date(activity.createdAt),
+        isCurrentUser: activity.userId === currentUserId,
+      };
+      setActivities((prev) => [...prev, newActivity]);
+      
+      // Update stats
+      if (activity.actionType === 'file_created') {
+        setFilesCreatedCount(prev => prev + 1);
+      } else if (activity.actionType === 'ai_request') {
+        setAIRequestsCount(prev => prev + 1);
+      }
+    });
+
+    return () => {
+      unsubscribeActivity();
+    };
+  }, [room.id]);
+  
+  // Timer for session duration
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeElapsed(Math.floor((Date.now() - sessionStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionStartTime]);
+  
+  // Track lines written
+  useEffect(() => {
+    const lines = currentCode.split('\n').length;
+    setLinesWritten(lines);
+  }, [currentCode]);
 
   // Code approvals temporarily disabled due to infinite loop issues
   // TODO: Redesign approval system with manual "Request Approval" button
@@ -337,7 +436,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   }, [room.id]);
   */
 
-  // Sync file changes to Supabase (debounced)
+  // Sync file changes to Supabase (reduced debounce for real-time feel)
   useEffect(() => {
     if (isRemoteUpdateRef.current) {
       console.log('Skipping sync - remote update in progress');
@@ -365,7 +464,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
           setIsSyncing(false);
         }
       }
-    }, 500); // Debounce 500ms
+    }, 200); // Reduced to 200ms for more real-time feel
 
     return () => {
       if (syncTimeoutRef.current) {
@@ -459,6 +558,9 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
     setActiveTab(path);
     setCurrentCode(content || '');
     addToast('success', `Opened ${path.split('/').pop()}`);
+    
+    // Log activity
+    logActivity(room.id, 'file_opened', { fileName: path.split('/').pop(), filePath: path });
   };
   
   const handleTabClose = (path: string) => {
@@ -557,18 +659,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
             </h2>
           </motion.div>
           
-          <motion.div 
-            className="px-3 py-1 rounded-full text-sm flex items-center gap-2"
-            style={{
-              background: room.role === 'Driver' ? 'var(--neon-orange)' : 'var(--orchid-electric)',
-              color: 'var(--ink-violet)',
-              fontFamily: 'var(--font-display)',
-            }}
-            whileHover={{ scale: 1.05 }}
-          >
-            <Sparkles size={14} />
-            {room.role}
-          </motion.div>
+          <RoleBadge role={room.role} size="lg" />
 
           {isSyncing && (
             <motion.div
@@ -776,6 +867,22 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                   <Sparkles size={16} />
                   <span className="text-sm">Quest</span>
                 </motion.button>
+                
+                <motion.button
+                  onClick={() => setActiveLeftPanel('activity')}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2"
+                  style={{
+                    background: activeLeftPanel === 'activity' ? 'rgba(81, 255, 196, 0.1)' : 'transparent',
+                    borderBottom: activeLeftPanel === 'activity' ? '2px solid var(--mint-glow)' : '2px solid transparent',
+                    color: 'var(--ticket-cream)',
+                    cursor: 'pointer',
+                  }}
+                  whileHover={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Clock size={16} />
+                  <span className="text-sm">Activity</span>
+                </motion.button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-3">
@@ -801,7 +908,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                         </div>
                       )}
                     </motion.div>
-                  ) : (
+                  ) : activeLeftPanel === 'constraints' ? (
                     <motion.div
                       key="constraints"
                       initial={{ opacity: 0, x: -20 }}
@@ -813,6 +920,17 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                       {room.constraints.map((constraint, i) => (
                         <ConstraintCard key={constraint.id} constraint={constraint} index={i} />
                       ))}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="activity"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ duration: 0.2 }}
+                      className="h-full"
+                    >
+                      <ActivityFeed activities={activities} />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -866,6 +984,10 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                 
                 // Debounced sync to Supabase (for remote user to see changes)
                 // This will trigger real-time update for the other user
+              }}
+              onCursorMove={(line, column) => {
+                // Update cursor position in Supabase (debounced by CodeEditor)
+                updateCursorPosition(room.id, activeTab, line, column);
               }}
               aiGeneratedCode={aiCode}
             />
@@ -1097,6 +1219,16 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       
       {/* Code Approval Modal - Temporarily disabled */}
       {/* TODO: Redesign approval system with manual "Request Approval" button to avoid infinite loops */}
+      
+      {/* Session Stats */}
+      <SessionStats
+        linesWritten={linesWritten}
+        filesCreated={filesCreatedCount}
+        aiRequests={aiRequestsCount}
+        timeElapsed={timeElapsed}
+        isOpen={showStats}
+        onToggle={() => setShowStats(!showStats)}
+      />
     </div>
   );
 }
