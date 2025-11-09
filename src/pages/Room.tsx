@@ -158,6 +158,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const approvalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastApprovalChangeId = useRef<string | null>(null);
   const lastToastTime = useRef<Record<string, number>>({});
+  const isBulkImportingRef = useRef(false);
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -236,11 +237,14 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       }
 
       // Debounced toast notification - only show once every 3 seconds per file
-      const now = Date.now();
-      const lastToast = lastToastTime.current[change.filePath] || 0;
-      if (now - lastToast > 3000) {
-        addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
-        lastToastTime.current[change.filePath] = now;
+      // Skip notifications during bulk AI imports
+      if (!isBulkImportingRef.current) {
+        const now = Date.now();
+        const lastToast = lastToastTime.current[change.filePath] || 0;
+        if (now - lastToast > 3000) {
+          addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
+          lastToastTime.current[change.filePath] = now;
+        }
       }
       
       // Reset flag after a brief delay to allow refreshFileSystem to complete
@@ -998,20 +1002,29 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                           setAiCode(code);
                           addToast('success', 'AI generated code ready!');
                         }}
-                        onProjectGenerated={(files) => {
+                        onProjectGenerated={async (files) => {
                           // AI generated multiple files
                           console.log('Importing files:', files);
+                          
+                          // Set bulk import flag to suppress individual notifications
+                          isBulkImportingRef.current = true;
+                          
                           vfs.importFiles(files);
                           refreshFileSystem();
                           
                           // Sync all files to Supabase
-                          files.forEach(async (file) => {
+                          for (const file of files) {
                             try {
                               await updateFile(room.id, file.path, file.content);
                             } catch (error) {
                               console.error('Error syncing file:', error);
                             }
-                          });
+                          }
+                          
+                          // Clear bulk import flag after a delay
+                          setTimeout(() => {
+                            isBulkImportingRef.current = false;
+                          }, 2000);
                           
                           // Open the main file
                           const mainFile = files.find(f => f.path.includes('App.tsx')) || files[0];
@@ -1022,7 +1035,8 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             setCurrentCode(mainFile.content);
                           }
                           
-                          addToast('success', `✨ Created ${files.length} files!`);
+                          // Single notification for all files
+                          addToast('success', `✨ AI created ${files.length} files!`);
                         }}
                       />
                     </motion.div>

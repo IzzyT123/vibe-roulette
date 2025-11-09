@@ -44,21 +44,28 @@ class AIService {
 CRITICAL RULES:
 1. You are IN A CONVERSATION - refer to previous messages and maintain context
 2. If user says "change the colors" or "make it bigger", you MUST modify the existing code shown in context
-3. NEVER import external npm packages. Use only React, TypeScript, browser APIs, inline CSS, and components/files you define in this response.
-4. For new features: Return MULTIPLE FILES with proper structure:
+3. NEVER import external npm packages. Use only React, TypeScript, browser APIs, inline CSS, SVG, Canvas, and components/files you define in this response.
+4. For CHARTS/VISUALIZATIONS: Use CSS animations, SVG elements, or HTML5 Canvas API. Create beautiful, interactive charts WITHOUT any libraries.
+5. For new features: Return MULTIPLE FILES with proper structure:
 
 // File: /src/App.tsx
 [complete file content]
 
-// File: /src/components/Button.tsx
+// File: /src/components/Chart.tsx
 [complete file content]
 
-5. For modifications: Return the UPDATED version of existing files
-6. Always include ALL necessary files (even if unchanged) when making multi-file changes
-7. Use inline styles OR CSS files
-8. Make everything interactive and production-ready
-9. NO explanations, NO tutorials - just code
+6. For modifications: Return the UPDATED version of existing files
+7. Always include ALL necessary files (even if unchanged) when making multi-file changes
+8. Use inline styles OR CSS files
+9. Make everything interactive and production-ready
 10. ${constraints.length > 0 ? `Constraints: ${constraints.join(', ')}` : 'Follow any additional constraints provided by the user exactly.'}
+
+CHART/VISUALIZATION EXAMPLES:
+- Bar charts: Use divs with height percentages and CSS animations
+- Line charts: Use SVG <path> elements with smooth curves
+- Pie charts: Use SVG <circle> with stroke-dasharray
+- Area charts: Use SVG <polygon> or Canvas gradients
+- Make them interactive with hover states and animations
 
 CONVERSATION CONTEXT:
 - Remember what you previously generated
@@ -858,6 +865,279 @@ export default function App() {
   );
 }`;
       explanation = 'Complete analytics dashboard with stats cards, interactive chart, and time range selector!';
+    } else if (lowerPrompt.includes('chart') || lowerPrompt.includes('graph') || lowerPrompt.includes('visualization')) {
+      code = `import { useState } from 'react';
+
+export default function App() {
+  const [chartType, setChartType] = useState('bar');
+  
+  const data = [
+    { label: 'Jan', value: 45 },
+    { label: 'Feb', value: 62 },
+    { label: 'Mar', value: 58 },
+    { label: 'Apr', value: 78 },
+    { label: 'May', value: 65 },
+    { label: 'Jun', value: 85 },
+  ];
+  
+  const maxValue = Math.max(...data.map(d => d.value));
+  
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0F0A1F, #1a1525)',
+      padding: '3rem',
+      fontFamily: 'system-ui',
+      color: 'white'
+    }}>
+      <h1 style={{
+        textAlign: 'center',
+        fontSize: '3rem',
+        marginBottom: '2rem',
+        background: 'linear-gradient(90deg, #FF6A00, #B16BFF, #51FFC4)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent'
+      }}>
+        📊 Interactive Charts
+      </h1>
+      
+      {/* Chart Type Selector */}
+      <div style={{ textAlign: 'center', marginBottom: '3rem', display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+        {['bar', 'line', 'pie'].map(type => (
+          <button
+            key={type}
+            onClick={() => setChartType(type)}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: chartType === type ? 'linear-gradient(135deg, #FF6A00, #B16BFF)' : 'rgba(255,255,255,0.1)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              textTransform: 'capitalize'
+            }}
+          >
+            {type} Chart
+          </button>
+        ))}
+      </div>
+      
+      {/* Chart Container */}
+      <div style={{
+        maxWidth: '900px',
+        margin: '0 auto',
+        background: 'rgba(255,255,255,0.05)',
+        borderRadius: '24px',
+        padding: '3rem',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        {/* Bar Chart */}
+        {chartType === 'bar' && (
+          <div style={{ height: '400px', display: 'flex', alignItems: 'flex-end', gap: '2rem', justifyContent: 'space-around' }}>
+            {data.map((item, index) => (
+              <div
+                key={item.label}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    height: \`\${(item.value / maxValue) * 100}%\`,
+                    background: \`linear-gradient(180deg, #51FFC4, #1DB954)\`,
+                    borderRadius: '8px 8px 0 0',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    minHeight: '20px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scaleY(1.05)';
+                    e.currentTarget.style.filter = 'brightness(1.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scaleY(1)';
+                    e.currentTarget.style.filter = 'brightness(1)';
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute',
+                    top: '-30px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontWeight: 'bold',
+                    color: '#51FFC4'
+                  }}>
+                    {item.value}
+                  </div>
+                </div>
+                <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Line Chart */}
+        {chartType === 'line' && (
+          <svg viewBox="0 0 800 400" style={{ width: '100%', height: '400px' }}>
+            <defs>
+              <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style={{ stopColor: '#FF6A00', stopOpacity: 1 }} />
+                <stop offset="50%" style={{ stopColor: '#B16BFF', stopOpacity: 1 }} />
+                <stop offset="100%" style={{ stopColor: '#51FFC4', stopOpacity: 1 }} />
+              </linearGradient>
+              <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style={{ stopColor: '#51FFC4', stopOpacity: 0.5 }} />
+                <stop offset="100%" style={{ stopColor: '#51FFC4', stopOpacity: 0 }} />
+              </linearGradient>
+            </defs>
+            
+            {/* Grid lines */}
+            {[0, 1, 2, 3, 4].map(i => (
+              <line
+                key={i}
+                x1="50"
+                y1={80 + i * 80}
+                x2="750"
+                y2={80 + i * 80}
+                stroke="rgba(255,255,255,0.1)"
+                strokeWidth="1"
+              />
+            ))}
+            
+            {/* Area fill */}
+            <polygon
+              points={\`50,350 \${data.map((d, i) => \`\${50 + i * 140},\${350 - (d.value / maxValue) * 270}\`).join(' ')} 750,350\`}
+              fill="url(#areaGradient)"
+            />
+            
+            {/* Line path */}
+            <polyline
+              points={data.map((d, i) => \`\${50 + i * 140},\${350 - (d.value / maxValue) * 270}\`).join(' ')}
+              fill="none"
+              stroke="url(#lineGradient)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            
+            {/* Data points */}
+            {data.map((item, i) => (
+              <g key={i}>
+                <circle
+                  cx={50 + i * 140}
+                  cy={350 - (item.value / maxValue) * 270}
+                  r="6"
+                  fill="#51FFC4"
+                  stroke="white"
+                  strokeWidth="2"
+                  style={{ cursor: 'pointer' }}
+                />
+                <text
+                  x={50 + i * 140}
+                  y="380"
+                  textAnchor="middle"
+                  fill="white"
+                  fontSize="14"
+                  opacity="0.8"
+                >
+                  {item.label}
+                </text>
+                <text
+                  x={50 + i * 140}
+                  y={340 - (item.value / maxValue) * 270}
+                  textAnchor="middle"
+                  fill="#51FFC4"
+                  fontSize="12"
+                  fontWeight="bold"
+                >
+                  {item.value}
+                </text>
+              </g>
+            ))}
+          </svg>
+        )}
+        
+        {/* Pie Chart */}
+        {chartType === 'pie' && (
+          <div style={{ position: 'relative', width: '400px', height: '400px', margin: '0 auto' }}>
+            <svg viewBox="0 0 200 200" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+              {(() => {
+                let currentAngle = 0;
+                const total = data.reduce((sum, d) => sum + d.value, 0);
+                const colors = ['#FF6A00', '#B16BFF', '#51FFC4', '#1DB954', '#FFD700', '#FF3366'];
+                
+                return data.map((item, i) => {
+                  const percentage = item.value / total;
+                  const angle = percentage * 360;
+                  const radius = 80;
+                  const circumference = 2 * Math.PI * radius;
+                  const strokeDasharray = \`\${(angle / 360) * circumference} \${circumference}\`;
+                  const rotation = currentAngle;
+                  currentAngle += angle;
+                  
+                  return (
+                    <circle
+                      key={i}
+                      cx="100"
+                      cy="100"
+                      r={radius}
+                      fill="none"
+                      stroke={colors[i % colors.length]}
+                      strokeWidth="40"
+                      strokeDasharray={strokeDasharray}
+                      style={{
+                        transform: \`rotate(\${rotation}deg)\`,
+                        transformOrigin: '100px 100px',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s'
+                      }}
+                    />
+                  );
+                });
+              })()}
+            </svg>
+            
+            {/* Legend */}
+            <div style={{
+              position: 'absolute',
+              bottom: '-80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              justifyContent: 'center'
+            }}>
+              {data.map((item, i) => {
+                const colors = ['#FF6A00', '#B16BFF', '#51FFC4', '#1DB954', '#FFD700', '#FF3366'];
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: colors[i % colors.length]
+                    }} />
+                    <span style={{ fontSize: '0.9rem' }}>{item.label}: {item.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}`;
+      explanation = 'Interactive multi-chart visualization with bar, line, and pie charts! Switch between chart types to see different visualizations of the same data. All built with pure CSS/SVG!';
     } else if (lowerPrompt.includes('landing') || lowerPrompt.includes('hero')) {
       code = `import { useState } from 'react';
 
@@ -1415,11 +1695,13 @@ export default function App() {
   // Real API implementations
   private async callOpenAI(systemPrompt: string, userPrompt: string, config: any, retryCount = 0): Promise<CodeGenerationResponse> {
     try {
-      const modelName = config.model || 'gpt-5';
+      const modelName = config.model || 'o1-preview';
       const hasRetried = retryCount > 0;
       
       // Validate model name - include all available OpenAI models
       const validModels = [
+        // GPT-5 Reasoning models (o1 series)
+        'o1-preview', 'o1-mini', 'o1',
         // GPT-5 models
         'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-codex', 'gpt-5-pro',
         // GPT-4o models
@@ -1431,10 +1713,33 @@ export default function App() {
         // GPT-3.5 models
         'gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106'
       ];
-      const useModel = validModels.includes(modelName) ? modelName : 'gpt-5';
+      const useModel = validModels.includes(modelName) ? modelName : 'o1-preview';
       
       if (modelName !== useModel && !hasRetried) {
         console.warn(`Model ${modelName} not recognized, falling back to ${useModel}`);
+      }
+      
+      // o1 models (reasoning models) don't support system messages or temperature
+      const isReasoningModel = useModel.startsWith('o1');
+      
+      const requestBody: any = {
+        model: useModel,
+        max_tokens: 16000 // Increased for reasoning models
+      };
+      
+      if (isReasoningModel) {
+        // For o1 models: combine system and user prompts into single user message
+        requestBody.messages = [
+          { role: 'user', content: `${systemPrompt}\n\n---\n\n${userPrompt}` }
+        ];
+        // o1 models don't support temperature parameter
+      } else {
+        // For standard models: use system message and temperature
+        requestBody.messages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ];
+        requestBody.temperature = 0.3;
       }
       
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1443,15 +1748,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
-        body: JSON.stringify({
-          model: useModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3, // Lower temperature for more consistent code generation
-          max_tokens: 8000 // Increased for better multi-file responses
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
@@ -1521,22 +1818,48 @@ export default function App() {
 
   private async chatOpenAI(message: string, codeContext: string | undefined, config: any): Promise<string> {
     try {
+      const modelName = config.model || 'o1-preview';
+      const isReasoningModel = modelName.startsWith('o1');
+      
       const systemPrompt = `You are an expert code generator for React apps. Generate ONLY complete, working code.
 
 RULES:
 - Return complete React components that work immediately
 - Use export default function App()
 - Include all imports
-- Use inline styles
-- Make it fully functional
+- Use inline styles or CSS files (NO external packages)
+- Make it fully functional and production-ready
+- For charts: Use CSS/SVG/Canvas for visualization (NO external libraries)
 - NO explanations unless specifically asked to explain
 - NO tutorials or setup instructions`;
 
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...this.conversationHistory,
-        { role: 'user', content: codeContext ? `Current code:\n\`\`\`\n${codeContext}\n\`\`\`\n\n${message}` : message }
-      ];
+      const requestBody: any = {
+        model: modelName,
+        max_tokens: isReasoningModel ? 16000 : 4000
+      };
+
+      if (isReasoningModel) {
+        // For o1 models: combine system prompt with conversation history
+        const conversationText = this.conversationHistory
+          .map(msg => `${msg.role.toUpperCase()}: ${msg.content}`)
+          .join('\n\n');
+        
+        const userContent = codeContext 
+          ? `${systemPrompt}\n\n---\n\nCONVERSATION HISTORY:\n${conversationText}\n\n---\n\nCurrent code:\n\`\`\`\n${codeContext}\n\`\`\`\n\n${message}`
+          : `${systemPrompt}\n\n---\n\nCONVERSATION HISTORY:\n${conversationText}\n\n---\n\n${message}`;
+        
+        requestBody.messages = [
+          { role: 'user', content: userContent }
+        ];
+      } else {
+        // For standard models: use system message
+        requestBody.messages = [
+          { role: 'system', content: systemPrompt },
+          ...this.conversationHistory,
+          { role: 'user', content: codeContext ? `Current code:\n\`\`\`\n${codeContext}\n\`\`\`\n\n${message}` : message }
+        ];
+        requestBody.temperature = 0.3;
+      }
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1544,12 +1867,7 @@ RULES:
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
-        body: JSON.stringify({
-          model: config.model || 'gpt-5', // Default to gpt-5
-          messages: messages,
-          temperature: 0.3,
-          max_tokens: 4000
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
