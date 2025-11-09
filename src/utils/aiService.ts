@@ -30,8 +30,8 @@ class AIService {
         console.error('Failed to load API config:', e);
       }
     }
-    // Default to mock (or o1-preview for best AI experience when API key is added)
-    return { provider: 'mock', apiKey: '', model: 'o1-preview' };
+    // Default to mock
+    return { provider: 'mock', apiKey: '', model: 'mock-gpt' };
   }
 
   async generateCode(request: CodeGenerationRequest): Promise<CodeGenerationResponse> {
@@ -1695,7 +1695,7 @@ export default function App() {
   // Real API implementations
   private async callOpenAI(systemPrompt: string, userPrompt: string, config: any, retryCount = 0): Promise<CodeGenerationResponse> {
     try {
-      const modelName = config.model || 'o1-preview';
+      const modelName = config.model || 'gpt-4o';
       const hasRetried = retryCount > 0;
       
       // Validate model name - include all available OpenAI models
@@ -1711,7 +1711,7 @@ export default function App() {
         // GPT-3.5 models
         'gpt-3.5-turbo', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106'
       ];
-      const useModel = validModels.includes(modelName) ? modelName : 'o1-preview';
+      const useModel = validModels.includes(modelName) ? modelName : 'gpt-4o';
       
       if (modelName !== useModel && !hasRetried) {
         console.warn(`Model ${modelName} not recognized, falling back to ${useModel}`);
@@ -1816,7 +1816,7 @@ export default function App() {
 
   private async chatOpenAI(message: string, codeContext: string | undefined, config: any): Promise<string> {
     try {
-      const modelName = config.model || 'o1-preview';
+      const modelName = config.model || 'gpt-4o';
       const isReasoningModel = modelName.startsWith('o1');
       
       const systemPrompt = `You are an expert code generator for React apps. Generate ONLY complete, working code.
@@ -1838,8 +1838,10 @@ RULES:
 
       if (isReasoningModel) {
         // For o1 models: combine system prompt with conversation history
-        const conversationText = this.conversationHistory
-          .map(msg => `${msg.role.toUpperCase()}: ${msg.content}`)
+        // Limit conversation history to avoid token limits
+        const recentHistory = this.conversationHistory.slice(-4); // Last 4 messages only
+        const conversationText = recentHistory
+          .map(msg => `${msg.role.toUpperCase()}: ${msg.content.substring(0, 500)}`)
           .join('\n\n');
         
         const userContent = codeContext 
@@ -1851,9 +1853,11 @@ RULES:
         ];
       } else {
         // For standard models: use system message
+        // Limit conversation history to last 8 messages to avoid token limits
+        const recentHistory = this.conversationHistory.slice(-8);
         requestBody.messages = [
           { role: 'system', content: systemPrompt },
-          ...this.conversationHistory,
+          ...recentHistory,
           { role: 'user', content: codeContext ? `Current code:\n\`\`\`\n${codeContext}\n\`\`\`\n\n${message}` : message }
         ];
         requestBody.temperature = 0.3;
