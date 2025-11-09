@@ -14,7 +14,7 @@ interface SessionEndProps {
 }
 
 export function SessionEnd({ roomId, onRestart, onViewRemix }: SessionEndProps) {
-  const [showConfetti] = useState(true);
+  const showConfetti = true;
   const [revealIdentity, setRevealIdentity] = useState(false);
   const [followPartner, setFollowPartner] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

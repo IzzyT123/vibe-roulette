@@ -35,7 +35,7 @@ class AIService {
   }
 
   async generateCode(request: CodeGenerationRequest): Promise<CodeGenerationResponse> {
-    const { prompt, context, language = 'typescript', constraints = [] } = request;
+    const { prompt, context, constraints = [] } = request;
     const config = this.getConfig();
     
     // Build Cursor-style system prompt with conversation awareness

@@ -136,7 +136,7 @@ export const api = {
     }
   },
   
-  async deploy(roomId: string): Promise<{ previewUrl: string }> {
+  async deploy(_roomId: string): Promise<{ previewUrl: string }> {
     await delay(800);
     return { previewUrl: 'https://example.com/preview' };
   },
@@ -146,7 +146,7 @@ export const api = {
     return { url: `https://checkout.stripe.com/test?amount=${amount}&room=${roomId}` };
   },
   
-  async saveRemix(roomId: string): Promise<{ noteId: string }> {
+  async saveRemix(_roomId: string): Promise<{ noteId: string }> {
     await delay(500);
     
     return { noteId: `note-${Date.now()}` };

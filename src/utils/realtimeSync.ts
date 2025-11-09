@@ -46,8 +46,8 @@ export function subscribeToSessionFiles(
         filter: `session_id=eq.${sessionId}`,
       },
       (payload) => {
-        const newData = payload.new as any;
-        const oldData = payload.old as any;
+        const newData = payload.new as Record<string, any>;
+        const oldData = payload.old as Record<string, any>;
         
         console.log('Realtime file change received:', {
           eventType: payload.eventType,
@@ -57,20 +57,20 @@ export function subscribeToSessionFiles(
         
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const fileChange: FileChange = {
-            sessionId: payload.new.session_id,
-            filePath: payload.new.file_path,
-            content: payload.new.content || '',
-            updatedBy: payload.new.updated_by,
-            updatedAt: payload.new.updated_at,
+            sessionId: newData.session_id,
+            filePath: newData.file_path,
+            content: newData.content || '',
+            updatedBy: newData.updated_by,
+            updatedAt: newData.updated_at,
           };
           callback(fileChange);
         } else if (payload.eventType === 'DELETE') {
           // Handle file deletion
           const fileChange: FileChange = {
-            sessionId: payload.old.session_id,
-            filePath: payload.old.file_path,
+            sessionId: oldData.session_id,
+            filePath: oldData.file_path,
             content: '',
-            updatedBy: payload.old.updated_by || '',
+            updatedBy: oldData.updated_by || '',
             updatedAt: new Date().toISOString(),
           };
           callback(fileChange);

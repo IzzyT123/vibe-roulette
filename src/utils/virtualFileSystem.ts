@@ -97,7 +97,7 @@ export class VirtualFileSystem {
   private mapToTree(map: Map<string, any>): VirtualNode[] {
     const result: VirtualNode[] = [];
     
-    for (const [, node] of map.entries()) {
+    for (const node of map.values()) {
       if (node.type === 'file') {
         result.push({
           path: node.path,
@@ -148,7 +148,7 @@ export class VirtualFileSystem {
   }
   
   // Create folder (ensures parent folders exist)
-  createFolder(path: string): void {
+  createFolder(_path: string): void {
     // Folders are implicit - just marker
   }
   
