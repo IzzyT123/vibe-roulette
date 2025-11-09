@@ -20,7 +20,7 @@ const AI_PROVIDERS = {
   openai: {
     name: 'OpenAI',
     models: [
-      // GPT-5 models (if available)
+      // GPT-5 models - Latest and most capable
       'gpt-5',
       'gpt-5-mini',
       'gpt-5-nano',
