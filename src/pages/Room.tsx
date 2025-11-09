@@ -155,6 +155,8 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const [pendingApproval, setPendingApproval] = useState<CodeApproval | null>(null);
   const [approvedCode, setApprovedCode] = useState<Map<string, string>>(new Map());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const approvalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastApprovalChangeId = useRef<string | null>(null);
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -283,12 +285,14 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
     };
   }, [room.id]);
 
-  // Subscribe to code approvals
+  // Code approvals temporarily disabled due to infinite loop issues
+  // TODO: Redesign approval system with manual "Request Approval" button
+  /*
   useEffect(() => {
     const loadPending = async () => {
       const pending = await getPendingApprovals(room.id);
       if (pending.length > 0) {
-        setPendingApproval(pending[0]); // Show first pending approval
+        setPendingApproval(pending[0]);
       }
     };
 
@@ -298,18 +302,14 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       if (approval.status === 'pending') {
         setPendingApproval(approval);
       } else if (approval.status === 'approved') {
-        // Both users approved - apply the code!
         setPendingApproval(null);
         vfs.setFile(approval.filePath, approval.codeContent);
         refreshFileSystem();
-        
-        // Update approvedCode map to trigger preview update
         setApprovedCode(prev => {
           const next = new Map(prev);
           next.set(approval.filePath, approval.codeContent);
           return next;
         });
-        
         addToast('success', `✅ Code approved by both users!`);
       } else if (approval.status === 'rejected') {
         setPendingApproval(null);
@@ -321,6 +321,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       unsubscribeApprovals();
     };
   }, [room.id]);
+  */
 
   // Sync file changes to Supabase (debounced)
   useEffect(() => {
@@ -825,7 +826,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
               role={room.role}
               filePath={activeTab}
               currentCode={currentCode}
-              onCodeChange={async (code) => {
+              onCodeChange={(code) => {
                 setCurrentCode(code);
                 
                 // Emit typing indicator
@@ -839,18 +840,18 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                   updateTypingStatus(room.id, false);
                 }, 1000);
                 
-                // Save to virtual file system (local only, won't update preview yet)
+                // Save to virtual file system (local changes, visible in editor)
                 vfs.setFile(activeTab, code);
                 
-                // Create approval request if code is substantial enough
-                // (Skip for very small changes like single character edits)
-                if (code.trim().length > 10) {
-                  try {
-                    await createCodeApproval(room.id, activeTab, code);
-                  } catch (error) {
-                    console.error('Error creating approval:', error);
-                  }
-                }
+                // Update local preview immediately (real-time editing experience)
+                setAllFiles(prevFiles => {
+                  const newFiles = new Map(prevFiles);
+                  newFiles.set(activeTab, code);
+                  return newFiles;
+                });
+                
+                // Debounced sync to Supabase (for remote user to see changes)
+                // This will trigger real-time update for the other user
               }}
               aiGeneratedCode={aiCode}
             />
@@ -964,7 +965,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                       <LivePreview 
                         code={currentCode} 
                         loading={false}
-                        allFiles={approvedCode.size > 0 ? approvedCode : allFiles}
+                        allFiles={allFiles}
                         onErrorDetected={(error) => {
                           console.log('Preview error detected:', error);
                         }}
@@ -1055,19 +1056,8 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         onClose={() => setIsSettingsOpen(false)}
       />
       
-      {/* Code Approval Modal */}
-      {pendingApproval && (
-        <CodeApprovalModal
-          approval={pendingApproval}
-          currentUserId={getCurrentUserId() || ''}
-          onApprove={async () => {
-            await approveCodeChange(room.id, pendingApproval.changeId);
-          }}
-          onReject={async () => {
-            await rejectCodeChange(room.id, pendingApproval.changeId);
-          }}
-        />
-      )}
+      {/* Code Approval Modal - Temporarily disabled */}
+      {/* TODO: Redesign approval system with manual "Request Approval" button to avoid infinite loops */}
     </div>
   );
 }
