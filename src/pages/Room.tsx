@@ -159,6 +159,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const lastApprovalChangeId = useRef<string | null>(null);
   const lastToastTime = useRef<Record<string, number>>({});
   const isBulkImportingRef = useRef(false);
+  const lastAINotificationTime = useRef<number>(0);
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -1003,7 +1004,12 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                         activeFilePath={activeTab}
                         onCodeGenerated={(code) => {
                           setAiCode(code);
-                          addToast('success', 'AI generated code ready!');
+                          // Debounce AI notifications - only once per 5 seconds
+                          const now = Date.now();
+                          if (now - lastAINotificationTime.current > 5000) {
+                            addToast('success', 'AI generated code ready!');
+                            lastAINotificationTime.current = now;
+                          }
                         }}
                         onProjectGenerated={async (files) => {
                           // AI generated multiple files
@@ -1038,8 +1044,12 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             setCurrentCode(mainFile.content);
                           }
                           
-                          // Single notification for all files
-                          addToast('success', `✨ AI created ${files.length} files!`);
+                          // Single notification for all files (debounced)
+                          const now = Date.now();
+                          if (now - lastAINotificationTime.current > 5000) {
+                            addToast('success', `✨ AI created ${files.length} files!`);
+                            lastAINotificationTime.current = now;
+                          }
                         }}
                       />
                     </motion.div>
@@ -1064,7 +1074,12 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         currentCode={currentCode}
         onCodeGenerated={(code) => {
           setAiCode(code);
-          addToast('success', 'AI generated code ready!');
+          // Debounce AI notifications - only once per 5 seconds
+          const now = Date.now();
+          if (now - lastAINotificationTime.current > 5000) {
+            addToast('success', 'AI generated code ready!');
+            lastAINotificationTime.current = now;
+          }
         }}
       />
       
