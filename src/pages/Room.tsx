@@ -738,8 +738,16 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
               currentCode={currentCode}
               onCodeChange={(code) => {
                 setCurrentCode(code);
-                // Save to virtual file system (don't refresh - causes loop!)
+                // Save to virtual file system
                 vfs.setFile(activeTab, code);
+                
+                // Update allFiles Map to trigger preview update for local user
+                // Create a new Map with updated content for the active file
+                setAllFiles(prevFiles => {
+                  const newFiles = new Map(prevFiles);
+                  newFiles.set(activeTab, code);
+                  return newFiles;
+                });
               }}
               aiGeneratedCode={aiCode}
             />
