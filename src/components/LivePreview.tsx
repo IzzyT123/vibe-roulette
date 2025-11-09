@@ -20,24 +20,32 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
   const [isFixing, setIsFixing] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [iframeKey, setIframeKey] = useState(0);
+  const lastContentHashRef = useRef<string>('');
 
   useEffect(() => {
     try {
       setError(null);
       setErrorDetails(null);
       
-      // Create a content hash from actual file contents to detect real changes
+      // Create a stable content hash to detect REAL changes only
       const filesKey = allFiles && allFiles.size > 0
         ? Array.from(allFiles.entries())
             .map(([path, content]) => `${path}:${content}`)
             .join('||')
         : `code:${code}`;
       
+      // Only update if content actually changed
+      if (filesKey === lastContentHashRef.current) {
+        console.log('LivePreview: Content unchanged, skipping update');
+        return;
+      }
+      
+      lastContentHashRef.current = filesKey;
+      
       console.log('LivePreview rendering with:', {
         codeLength: code.length,
         fileCount: allFiles?.size || 0,
         files: allFiles ? Array.from(allFiles.keys()) : [],
-        contentHash: filesKey.substring(0, 100) // Log first 100 chars
       });
       
       // Use multi-file bundler if we have multiple files
