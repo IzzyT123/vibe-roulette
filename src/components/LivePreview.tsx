@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Monitor, RefreshCw, AlertCircle } from 'lucide-react';
 import { generatePreviewHTML } from '../utils/multiFileBundler';
@@ -22,31 +22,33 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
   const [iframeKey, setIframeKey] = useState(0);
   const lastContentHashRef = useRef<string>('');
 
+  // Memoize the content hash to prevent unnecessary recalculations
+  const contentHash = useMemo(() => {
+    const filesKey = allFiles && allFiles.size > 0
+      ? Array.from(allFiles.entries())
+          .map(([path, content]) => `${path}:${content}`)
+          .join('||')
+      : `code:${code}`;
+    return filesKey;
+  }, [code, allFiles]);
+
   useEffect(() => {
     try {
-      setError(null);
-      setErrorDetails(null);
-      
-      // Create a stable content hash to detect REAL changes only
-      const filesKey = allFiles && allFiles.size > 0
-        ? Array.from(allFiles.entries())
-            .map(([path, content]) => `${path}:${content}`)
-            .join('||')
-        : `code:${code}`;
-      
       // Only update if content actually changed
-      if (filesKey === lastContentHashRef.current) {
-        console.log('LivePreview: Content unchanged, skipping update');
-        return;
+      if (contentHash === lastContentHashRef.current) {
+        return; // Silent skip - don't even log
       }
       
-      lastContentHashRef.current = filesKey;
+      lastContentHashRef.current = contentHash;
       
       console.log('LivePreview rendering with:', {
         codeLength: code.length,
         fileCount: allFiles?.size || 0,
         files: allFiles ? Array.from(allFiles.keys()) : [],
       });
+      
+      setError(null);
+      setErrorDetails(null);
       
       // Use multi-file bundler if we have multiple files
       const html = (allFiles && allFiles.size > 0)
@@ -59,22 +61,6 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
       setPreviewHtml(html);
       setIframeKey(prev => prev + 1);
       setLastUpdate(Date.now());
-
-      // Listen for errors from iframe
-      const handleMessage = (event: MessageEvent) => {
-        if (event.data && event.data.type === 'preview-error') {
-          const errorMsg = event.data.error || 'Unknown error';
-          const errorStack = event.data.stack;
-          setError(errorMsg);
-          setErrorDetails({ message: errorMsg, stack: errorStack });
-          if (onErrorDetected) {
-            onErrorDetected(errorMsg);
-          }
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
     } catch (err) {
       console.error('Preview error:', err);
       const errorMsg = err instanceof Error ? err.message : 'Failed to render preview';
@@ -84,7 +70,25 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
         onErrorDetected(errorMsg);
       }
     }
-  }, [code, allFiles, onErrorDetected]);
+  }, [contentHash]); // Only depend on the memoized content hash
+  
+  // Separate effect for error message listening
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'preview-error') {
+        const errorMsg = event.data.error || 'Unknown error';
+        const errorStack = event.data.stack;
+        setError(errorMsg);
+        setErrorDetails({ message: errorMsg, stack: errorStack });
+        if (onErrorDetected) {
+          onErrorDetected(errorMsg);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onErrorDetected]);
 
   const handleRefresh = () => {
     // Force iframe recreation by incrementing key
