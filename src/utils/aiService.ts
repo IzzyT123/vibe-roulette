@@ -30,8 +30,8 @@ class AIService {
         console.error('Failed to load API config:', e);
       }
     }
-    // Default to mock
-    return { provider: 'mock', apiKey: '', model: 'mock-gpt' };
+    // Default to mock (or o1-preview for best AI experience when API key is added)
+    return { provider: 'mock', apiKey: '', model: 'o1-preview' };
   }
 
   async generateCode(request: CodeGenerationRequest): Promise<CodeGenerationResponse> {
@@ -1700,18 +1700,16 @@ export default function App() {
       
       // Validate model name - include all available OpenAI models
       const validModels = [
-        // GPT-5 Reasoning models (o1 series)
+        // Latest Reasoning models (o1 series)
         'o1-preview', 'o1-mini', 'o1',
-        // GPT-5 models
-        'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-codex', 'gpt-5-pro',
-        // GPT-4o models
-        'gpt-4o', 'gpt-4o-2024-08-06', 'gpt-4o-2024-05-13', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18',
+        // Latest GPT-4o models
+        'gpt-4o', 'gpt-4o-mini', 'chatgpt-4o-latest', 'gpt-4o-2024-11-20', 'gpt-4o-2024-08-06', 'gpt-4o-2024-05-13', 'gpt-4o-mini-2024-07-18',
         // GPT-4 Turbo models
-        'gpt-4-turbo', 'gpt-4-turbo-2024-04-09',
+        'gpt-4-turbo', 'gpt-4-turbo-2024-04-09', 'gpt-4-turbo-preview',
         // GPT-4 models
-        'gpt-4', 'gpt-4-0613', 'gpt-4-32k', 'gpt-4-32k-0613',
+        'gpt-4', 'gpt-4-0613', 'gpt-4-0125-preview',
         // GPT-3.5 models
-        'gpt-3.5-turbo', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106'
+        'gpt-3.5-turbo', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106'
       ];
       const useModel = validModels.includes(modelName) ? modelName : 'o1-preview';
       
@@ -1766,11 +1764,11 @@ export default function App() {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
         
-        // If model not found, try falling back to GPT-4o (only once)
+        // If model not found, try falling back to latest stable model (only once)
         if (!hasRetried && (errorCode === 'model_not_found' || errorMessage.toLowerCase().includes('model') || response.status === 404)) {
-          console.warn(`Model ${useModel} not available, falling back to gpt-4o`);
-          // Retry with GPT-4o as fallback
-          return this.callOpenAI(systemPrompt, userPrompt, { ...config, model: 'gpt-4o' }, retryCount + 1);
+          console.warn(`Model ${useModel} not available, falling back to chatgpt-4o-latest`);
+          // Retry with chatgpt-4o-latest as fallback (always uses latest GPT-4o)
+          return this.callOpenAI(systemPrompt, userPrompt, { ...config, model: 'chatgpt-4o-latest' }, retryCount + 1);
         }
         
         throw new Error(`OpenAI API error: ${errorMessage}${errorDetails ? ` (${errorDetails})` : ''}`);

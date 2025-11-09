@@ -20,33 +20,28 @@ const AI_PROVIDERS = {
   openai: {
     name: 'OpenAI',
     models: [
-      // GPT-5 Reasoning models - Best for complex code generation
-      'o1-preview', // GPT-5 reasoning preview
-      'o1-mini', // GPT-5 reasoning mini (faster)
-      'o1', // GPT-5 reasoning (most capable)
-      // GPT-5 Standard models
-      'gpt-5',
-      'gpt-5-mini',
-      'gpt-5-nano',
-      'gpt-5-codex',
-      'gpt-5-pro',
-      // GPT-4o models
-      'gpt-4o',
+      // Latest Reasoning Models (o1 series) - Best for complex tasks
+      'o1-preview', // Most capable reasoning model
+      'o1-mini', // Fast reasoning model
+      'o1', // Full reasoning model
+      // Latest GPT-4o Models (Recommended for most use cases)
+      'gpt-4o', // Latest multimodal flagship
+      'gpt-4o-mini', // Fast and affordable
+      'gpt-4o-2024-11-20', // Latest dated version
       'gpt-4o-2024-08-06',
       'gpt-4o-2024-05-13',
-      'gpt-4o-mini',
       'gpt-4o-mini-2024-07-18',
-      // GPT-4 Turbo models
+      'chatgpt-4o-latest', // Always latest GPT-4o
+      // GPT-4 Turbo Models
       'gpt-4-turbo',
       'gpt-4-turbo-2024-04-09',
-      // GPT-4 models
+      'gpt-4-turbo-preview',
+      // GPT-4 Models
       'gpt-4',
       'gpt-4-0613',
-      'gpt-4-32k',
-      'gpt-4-32k-0613',
-      // GPT-3.5 models
+      'gpt-4-0125-preview',
+      // GPT-3.5 Turbo Models
       'gpt-3.5-turbo',
-      'gpt-3.5-turbo-16k',
       'gpt-3.5-turbo-0125',
       'gpt-3.5-turbo-1106'
     ],
