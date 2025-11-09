@@ -10,6 +10,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  userId?: string; // To distinguish between current user and partner
 }
 
 interface AIChatPanelProps {
@@ -21,6 +22,7 @@ interface AIChatPanelProps {
   setMessages: Dispatch<SetStateAction<Message[]>>;
   activeFilePath?: string;
   sessionId?: string; // For real-time chat sync
+  currentUserId?: string; // To distinguish own messages from partner's
 }
 
 export function AIChatPanel({ 
@@ -31,7 +33,8 @@ export function AIChatPanel({
   messages,
   setMessages,
   activeFilePath,
-  sessionId
+  sessionId,
+  currentUserId
 }: AIChatPanelProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +59,8 @@ export function AIChatPanel({
       id: Date.now().toString(),
       role: 'user',
       content: input,
-      timestamp: new Date()
+      timestamp: new Date(),
+      userId: currentUserId
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -260,7 +264,13 @@ export function AIChatPanel({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         <AnimatePresence mode="popLayout">
-          {messages.map((message) => (
+          {messages.map((message) => {
+            // Determine if this is current user, partner, or AI
+            const isOwnMessage = message.role === 'user' && message.userId === currentUserId;
+            const isPartnerMessage = message.role === 'user' && message.userId !== currentUserId;
+            const isAIMessage = message.role === 'assistant';
+            
+            return (
             <motion.div
               key={message.id}
               layout
@@ -268,23 +278,27 @@ export function AIChatPanel({
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: -20, opacity: 0, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
             >
               <div
                 className="max-w-[90%] rounded-lg p-3 relative"
                 style={{
-                  background: message.role === 'user' 
-                    ? 'var(--neon-orange)' 
-                    : 'rgba(247, 244, 233, 0.05)',
-                  color: message.role === 'user' 
-                    ? 'var(--ink-violet)' 
-                    : 'var(--ticket-cream)',
-                  border: message.role === 'assistant' 
+                  background: isOwnMessage
+                    ? 'var(--neon-orange)' // Orange for your messages
+                    : isPartnerMessage
+                    ? 'rgba(177, 107, 255, 0.3)' // Purple for partner's messages
+                    : 'rgba(247, 244, 233, 0.05)', // Dark for AI messages
+                  color: isOwnMessage
+                    ? 'var(--ink-violet)' // Dark text for orange background
+                    : 'var(--ticket-cream)', // Light text for dark backgrounds
+                  border: isAIMessage
                     ? '1px solid rgba(247, 244, 233, 0.1)' 
+                    : isPartnerMessage
+                    ? '1px solid var(--orchid-electric)'
                     : 'none',
                 }}
               >
-                {message.role === 'assistant' && (
+                {isAIMessage && (
                   <motion.div
                     className="absolute -left-2 -top-2"
                     animate={{ rotate: [0, 360] }}
@@ -292,6 +306,24 @@ export function AIChatPanel({
                   >
                     <Sparkles size={14} color="var(--mint-glow)" />
                   </motion.div>
+                )}
+                
+                {isPartnerMessage && (
+                  <div
+                    className="absolute -left-2 -top-2"
+                    style={{
+                      background: 'var(--orchid-electric)',
+                      borderRadius: '50%',
+                      width: '18px',
+                      height: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px'
+                    }}
+                  >
+                    👤
+                  </div>
                 )}
                 
                 {extractCodeBlocks(message.content).map((part, idx) => (
@@ -365,7 +397,8 @@ export function AIChatPanel({
                 ))}
               </div>
             </motion.div>
-          ))}
+          );
+          })}
         </AnimatePresence>
         
         {isLoading && (

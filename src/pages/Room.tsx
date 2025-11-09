@@ -190,6 +190,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
             role: msg.role || 'user', // Use role from database, default to 'user'
             content: msg.message,
             timestamp: new Date(msg.createdAt),
+            userId: msg.userId, // Include userId to distinguish messages
           }));
           setChatMessages([...createInitialChatMessages(), ...messages]);
         } else {
@@ -272,6 +273,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         role: message.role || 'user', // Use role from database, default to 'user' for backwards compatibility
         content: message.message,
         timestamp: new Date(message.createdAt),
+        userId: message.userId, // Include userId to distinguish messages
       };
       setChatMessages((prev) => [...prev, chatMessage]);
     });
@@ -993,6 +995,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                     >
                       <AIChatPanel
                         sessionId={room.id}
+                        currentUserId={getCurrentUserId() || undefined}
                         messages={chatMessages}
                         setMessages={setChatMessages}
                         currentCode={currentCode}
