@@ -18,26 +18,26 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
   const [scanlinesEnabled, setScanlinesEnabled] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [isFixing, setIsFixing] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string>('');
+  const [iframeKey, setIframeKey] = useState(0);
 
   useEffect(() => {
-    if (!iframeRef.current) return;
-
     try {
       setError(null);
       setErrorDetails(null);
       
-      // Create a stable key from file contents to detect changes
+      // Create a content hash from actual file contents to detect real changes
       const filesKey = allFiles && allFiles.size > 0
         ? Array.from(allFiles.entries())
-            .map(([path, content]) => `${path}:${content.length}`)
-            .join('|')
-        : `code:${code.length}`;
+            .map(([path, content]) => `${path}:${content}`)
+            .join('||')
+        : `code:${code}`;
       
       console.log('LivePreview rendering with:', {
         codeLength: code.length,
         fileCount: allFiles?.size || 0,
         files: allFiles ? Array.from(allFiles.keys()) : [],
-        filesKey: filesKey.substring(0, 100) // Log first 100 chars
+        contentHash: filesKey.substring(0, 100) // Log first 100 chars
       });
       
       // Use multi-file bundler if we have multiple files
@@ -47,18 +47,10 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
 
       console.log('Generated HTML length:', html.length);
 
-      // Use srcdoc instead of contentDocument to avoid CORS issues
-      const iframe = iframeRef.current;
-      // Force update by setting to empty first, then new content
-      // This ensures the iframe reloads even if HTML is similar
-      iframe.srcdoc = '';
-      // Use requestAnimationFrame to ensure the empty state is processed
-      requestAnimationFrame(() => {
-        if (iframeRef.current) {
-          iframeRef.current.srcdoc = html;
-          setLastUpdate(Date.now());
-        }
-      });
+      // Update HTML and force iframe recreation by changing key
+      setPreviewHtml(html);
+      setIframeKey(prev => prev + 1);
+      setLastUpdate(Date.now());
 
       // Listen for errors from iframe
       const handleMessage = (event: MessageEvent) => {
@@ -87,9 +79,8 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
   }, [code, allFiles, onErrorDetected]);
 
   const handleRefresh = () => {
-    if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src;
-    }
+    // Force iframe recreation by incrementing key
+    setIframeKey(prev => prev + 1);
     setError(null);
     setErrorDetails(null);
   };
@@ -261,7 +252,9 @@ export function LivePreview({ code, loading = false, allFiles, onErrorDetected, 
         {/* Preview iframe */}
         {!loading && (
           <iframe
+            key={iframeKey}
             ref={iframeRef}
+            srcDoc={previewHtml}
             className="w-full h-full border-0"
             title="Live Preview"
             sandbox="allow-scripts"
