@@ -180,6 +180,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const lastApprovalChangeId = useRef<string | null>(null);
   const lastToastTime = useRef<Record<string, number>>({});
   const isBulkImportingRef = useRef(false);
+  const isAIGeneratingRef = useRef(false);
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -462,6 +463,11 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
     if (isRemoteUpdateRef.current) {
       console.log('Skipping sync - remote update in progress');
       return; // Don't sync remote updates
+    }
+    
+    if (isAIGeneratingRef.current) {
+      console.log('Skipping sync - AI code being generated');
+      return; // Don't sync during AI generation (AI handles sync itself)
     }
 
     if (syncTimeoutRef.current) {
@@ -980,6 +986,11 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
               filePath={activeTab}
               currentCode={currentCode}
               onCodeChange={(code) => {
+                // Skip if AI is generating (prevents loop)
+                if (isAIGeneratingRef.current) {
+                  return;
+                }
+                
                 setCurrentCode(code);
                 
                 // Emit typing indicator
@@ -1146,6 +1157,9 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                         allFiles={allFiles}
                         activeFilePath={activeTab}
                         onCodeGenerated={async (code) => {
+                          // Set AI flag to prevent onChange loop
+                          isAIGeneratingRef.current = true;
+                          
                           setAiCode(code);
                           
                           // Apply the code to VFS
@@ -1168,14 +1182,20 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             console.error('Error syncing AI code:', error);
                           }
                           
+                          // Clear AI flag after a delay
+                          setTimeout(() => {
+                            isAIGeneratingRef.current = false;
+                          }, 1000);
+                          
                           // No notification - code appears directly in editor and preview
                         }}
                         onProjectGenerated={async (files) => {
                           // AI generated multiple files
                           console.log('Importing files:', files);
                           
-                          // Set bulk import flag to suppress individual notifications
+                          // Set flags to prevent loops
                           isBulkImportingRef.current = true;
+                          isAIGeneratingRef.current = true;
                           
                           vfs.importFiles(files);
                           refreshFileSystem();
@@ -1189,9 +1209,10 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             }
                           }
                           
-                          // Clear bulk import flag after a delay
+                          // Clear flags after a delay
                           setTimeout(() => {
                             isBulkImportingRef.current = false;
+                            isAIGeneratingRef.current = false;
                           }, 2000);
                           
                           // Open the main file
@@ -1227,6 +1248,9 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         onClose={() => setIsAIChatOpen(false)}
         currentCode={currentCode}
         onCodeGenerated={async (code) => {
+          // Set AI flag to prevent onChange loop
+          isAIGeneratingRef.current = true;
+          
           setAiCode(code);
           
           // Apply the code to VFS
@@ -1248,6 +1272,11 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
           } catch (error) {
             console.error('Error syncing AI code:', error);
           }
+          
+          // Clear AI flag after a delay
+          setTimeout(() => {
+            isAIGeneratingRef.current = false;
+          }, 1000);
           
           // No notification - code appears directly in editor and preview
         }}
