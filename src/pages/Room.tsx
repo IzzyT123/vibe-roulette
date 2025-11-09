@@ -1146,12 +1146,33 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                         currentCode={currentCode}
                         allFiles={allFiles}
                         activeFilePath={activeTab}
-                        onCodeGenerated={(code) => {
+                        onCodeGenerated={async (code) => {
                           setAiCode(code);
-                          // Debounce AI notifications - only once per 5 seconds
+                          
+                          // Apply the code to VFS
+                          vfs.setFile(activeTab, code);
+                          setCurrentCode(code);
+                          
+                          // Update allFiles Map to trigger preview update
+                          setAllFiles(prevFiles => {
+                            const newFiles = new Map(prevFiles);
+                            newFiles.set(activeTab, code);
+                            return newFiles;
+                          });
+                          
+                          refreshFileSystem();
+                          
+                          // Sync to Supabase for other user
+                          try {
+                            await updateFile(room.id, activeTab, code);
+                          } catch (error) {
+                            console.error('Error syncing AI code:', error);
+                          }
+                          
+                          // Single notification (debounced)
                           const now = Date.now();
                           if (now - lastAINotificationTime.current > 5000) {
-                            addToast('success', 'AI generated code ready!');
+                            addToast('success', 'AI generated code!');
                             lastAINotificationTime.current = now;
                           }
                         }}
@@ -1216,12 +1237,33 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         isOpen={isAIChatOpen}
         onClose={() => setIsAIChatOpen(false)}
         currentCode={currentCode}
-        onCodeGenerated={(code) => {
+        onCodeGenerated={async (code) => {
           setAiCode(code);
-          // Debounce AI notifications - only once per 5 seconds
+          
+          // Apply the code to VFS
+          vfs.setFile(activeTab, code);
+          setCurrentCode(code);
+          
+          // Update allFiles Map to trigger preview update
+          setAllFiles(prevFiles => {
+            const newFiles = new Map(prevFiles);
+            newFiles.set(activeTab, code);
+            return newFiles;
+          });
+          
+          refreshFileSystem();
+          
+          // Sync to Supabase for other user
+          try {
+            await updateFile(room.id, activeTab, code);
+          } catch (error) {
+            console.error('Error syncing AI code:', error);
+          }
+          
+          // Single notification (debounced)
           const now = Date.now();
           if (now - lastAINotificationTime.current > 5000) {
-            addToast('success', 'AI generated code ready!');
+            addToast('success', 'AI generated code!');
             lastAINotificationTime.current = now;
           }
         }}
