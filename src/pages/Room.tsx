@@ -236,6 +236,9 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
 
   // Subscribe to real-time file changes
   useEffect(() => {
+    let fileChangeCount = 0;
+    let fileChangeTimeout: NodeJS.Timeout | null = null;
+    
     const unsubscribeFiles = subscribeToSessionFiles(room.id, (change) => {
       const userId = getCurrentUserId();
       // Don't apply our own changes (they're already in VFS)
@@ -259,16 +262,32 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         setCurrentCode(change.content);
       }
 
-      // Debounced toast notification - only show once every 3 seconds per file
-      // Skip notifications during bulk AI imports
-      if (!isBulkImportingRef.current) {
-        const now = Date.now();
-        const lastToast = lastToastTime.current[change.filePath] || 0;
-        if (now - lastToast > 3000) {
-          addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
-          lastToastTime.current[change.filePath] = now;
-        }
+      // Smart notification system for bulk imports
+      fileChangeCount++;
+      
+      // Clear existing timeout
+      if (fileChangeTimeout) {
+        clearTimeout(fileChangeTimeout);
       }
+      
+      // Set new timeout - if more changes come in within 500ms, it's a bulk import
+      fileChangeTimeout = setTimeout(() => {
+        // After 500ms of no changes, show notification
+        if (fileChangeCount > 1) {
+          // Multiple files changed - show bulk notification
+          addToast('info', `✨ ${fileChangeCount} files updated by collaborator`);
+        } else if (fileChangeCount === 1) {
+          // Single file changed - show specific notification
+          const now = Date.now();
+          const lastToast = lastToastTime.current[change.filePath] || 0;
+          if (now - lastToast > 3000) {
+            addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
+            lastToastTime.current[change.filePath] = now;
+          }
+        }
+        // Reset counter
+        fileChangeCount = 0;
+      }, 500);
       
       // Reset flag after a brief delay to allow refreshFileSystem to complete
       setTimeout(() => {
@@ -278,6 +297,9 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
 
     return () => {
       unsubscribeFiles();
+      if (fileChangeTimeout) {
+        clearTimeout(fileChangeTimeout);
+      }
     };
   }, [room.id, activeTab]);
 

@@ -20,6 +20,8 @@ const AI_PROVIDERS = {
   openai: {
     name: 'OpenAI',
     models: [
+      // GPT-5 (if you have access)
+      'gpt-5',
       // Latest Reasoning Models (o1 series) - Best for complex tasks
       'o1-preview', // Most capable reasoning model
       'o1-mini', // Fast reasoning model
@@ -79,8 +81,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
         setProvider(config.provider);
         setApiKey(config.apiKey || '');
         // Use saved model or default to best model for provider
-        // Default to gpt-4o (most widely available)
-        const defaultModel = config.provider === 'openai' ? 'gpt-4o' 
+        // Default to gpt-5 (best quality if available, will fallback automatically)
+        const defaultModel = config.provider === 'openai' ? 'gpt-5' 
           : config.provider === 'anthropic' ? 'claude-3-5-sonnet-20241022'
           : 'mock-gpt';
         setModel(config.model || defaultModel);
@@ -96,7 +98,7 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
   useEffect(() => {
     // Update model when provider changes - default to best model
     if (!model || !AI_PROVIDERS[provider].models.includes(model)) {
-      const defaultModel = provider === 'openai' ? 'gpt-4o' 
+      const defaultModel = provider === 'openai' ? 'gpt-5' 
         : provider === 'anthropic' ? 'claude-3-5-sonnet-20241022'
         : 'mock-gpt';
       setModel(defaultModel);

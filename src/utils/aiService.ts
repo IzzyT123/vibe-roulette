@@ -41,12 +41,19 @@ class AIService {
     // Build Cursor-style system prompt with conversation awareness
     const systemPrompt = `You are an expert React/TypeScript code generator like Cursor and Bolt.new.
 
-CRITICAL RULES:
+CRITICAL RULES FOR HIGH-QUALITY CODE:
 1. You are IN A CONVERSATION - refer to previous messages and maintain context
 2. If user says "change the colors" or "make it bigger", you MUST modify the existing code shown in context
 3. NEVER import external npm packages. Use only React, TypeScript, browser APIs, inline CSS, SVG, Canvas, and components/files you define in this response.
-4. For CHARTS/VISUALIZATIONS: Use CSS animations, SVG elements, or HTML5 Canvas API. Create beautiful, interactive charts WITHOUT any libraries.
-5. For new features: Return MULTIPLE FILES with proper structure:
+4. GENERATE COMPLETE, ERROR-FREE CODE:
+   - All JSX tags must be properly closed
+   - All string literals must be properly quoted
+   - All functions must have complete implementations
+   - All variables must be declared before use
+   - Use proper TypeScript types (but keep them simple)
+   - No syntax errors, no incomplete statements
+5. For CHARTS/VISUALIZATIONS: Use CSS animations, SVG elements, or HTML5 Canvas API. Create beautiful, interactive charts WITHOUT any libraries.
+6. For new features: Return MULTIPLE FILES with proper structure:
 
 // File: /src/App.tsx
 [complete file content]
@@ -54,18 +61,27 @@ CRITICAL RULES:
 // File: /src/components/Chart.tsx
 [complete file content]
 
-6. For modifications: Return the UPDATED version of existing files
-7. Always include ALL necessary files (even if unchanged) when making multi-file changes
-8. Use inline styles OR CSS files
-9. Make everything interactive and production-ready
-10. ${constraints.length > 0 ? `Constraints: ${constraints.join(', ')}` : 'Follow any additional constraints provided by the user exactly.'}
+7. For modifications: Return the UPDATED version of existing files
+8. Always include ALL necessary files (even if unchanged) when making multi-file changes
+9. Use inline styles OR CSS files
+10. Make everything interactive and production-ready
+11. ${constraints.length > 0 ? `Constraints: ${constraints.join(', ')}` : 'Follow any additional constraints provided by the user exactly.'}
+12. TEST YOUR CODE MENTALLY: Read through it and ensure no syntax errors, no missing brackets, no incomplete lines
 
 CHART/VISUALIZATION EXAMPLES:
 - Bar charts: Use divs with height percentages and CSS animations
-- Line charts: Use SVG <path> elements with smooth curves
+- Line charts: Use SVG <path> elements with smooth curves  
 - Pie charts: Use SVG <circle> with stroke-dasharray
 - Area charts: Use SVG <polygon> or Canvas gradients
 - Make them interactive with hover states and animations
+
+QUALITY CHECKLIST BEFORE RESPONDING:
+✓ All imports are correct
+✓ All JSX tags are closed
+✓ All strings are properly quoted
+✓ All functions have complete bodies
+✓ No syntax errors
+✓ Code will compile and run immediately
 
 CONVERSATION CONTEXT:
 - Remember what you previously generated
@@ -73,7 +89,7 @@ CONVERSATION CONTEXT:
 - Maintain the project structure
 - Be context-aware across multiple turns
 
-Return complete, working code that builds on previous conversation.`;
+Return complete, working, ERROR-FREE code that builds on previous conversation.`;
 
     // Build user prompt with full conversation history
     let conversationContext = '';
@@ -1695,11 +1711,13 @@ export default function App() {
   // Real API implementations
   private async callOpenAI(systemPrompt: string, userPrompt: string, config: any, retryCount = 0): Promise<CodeGenerationResponse> {
     try {
-      const modelName = config.model || 'gpt-4o';
+      const modelName = config.model || 'gpt-5';
       const hasRetried = retryCount > 0;
       
       // Validate model name - include all available OpenAI models
       const validModels = [
+        // GPT-5
+        'gpt-5',
         // Latest Reasoning models (o1 series)
         'o1-preview', 'o1-mini', 'o1',
         // Latest GPT-4o models
@@ -1711,7 +1729,7 @@ export default function App() {
         // GPT-3.5 models
         'gpt-3.5-turbo', 'gpt-3.5-turbo-0125', 'gpt-3.5-turbo-1106'
       ];
-      const useModel = validModels.includes(modelName) ? modelName : 'gpt-4o';
+      const useModel = validModels.includes(modelName) ? modelName : 'gpt-5';
       
       if (modelName !== useModel && !hasRetried) {
         console.warn(`Model ${modelName} not recognized, falling back to ${useModel}`);
@@ -1816,7 +1834,7 @@ export default function App() {
 
   private async chatOpenAI(message: string, codeContext: string | undefined, config: any): Promise<string> {
     try {
-      const modelName = config.model || 'gpt-4o';
+      const modelName = config.model || 'gpt-5';
       const isReasoningModel = modelName.startsWith('o1');
       
       const systemPrompt = `You are an expert code generator for React apps. Generate ONLY complete, working code.
