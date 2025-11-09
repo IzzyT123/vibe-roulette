@@ -13,7 +13,6 @@ import { EditorTabs, EditorTab } from '../components/EditorTabs';
 import { UserProfile } from '../components/UserProfile';
 import { CodeApprovalModal } from '../components/CodeApprovalModal';
 import { ActivityFeed, type Activity } from '../components/ActivityFeed';
-import { SessionStats } from '../components/SessionStats';
 import { RoleBadge } from '../components/RoleBadge';
 import { vfs } from '../utils/virtualFileSystem';
 import { soundEffects } from '../utils/soundEffects';
@@ -162,7 +161,6 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const [activeRightPanel, setActiveRightPanel] = useState<'preview' | 'ai'>('preview');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
-  const [showStats, setShowStats] = useState(false);
   const [sessionStartTime] = useState(Date.now());
   const [linesWritten, setLinesWritten] = useState(0);
   const [filesCreatedCount, setFilesCreatedCount] = useState(0);
@@ -1297,16 +1295,6 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
       
       {/* Code Approval Modal - Temporarily disabled */}
       {/* TODO: Redesign approval system with manual "Request Approval" button to avoid infinite loops */}
-      
-      {/* Session Stats */}
-      <SessionStats
-        linesWritten={linesWritten}
-        filesCreated={filesCreatedCount}
-        aiRequests={aiRequestsCount}
-        timeElapsed={timeElapsed}
-        isOpen={showStats}
-        onToggle={() => setShowStats(!showStats)}
-      />
     </div>
   );
 }
