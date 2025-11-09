@@ -24,11 +24,11 @@ export default function App() {
     getOrCreateAnonymousUser().catch(console.error);
   }, []);
   
-  const handleSpin = async (anonMode: boolean, sessionLength: number) => {
+  const handleSpin = async () => {
     console.log('App: handleSpin called');
     
     try {
-      const result = await api.spin(anonMode, sessionLength);
+      const result = await api.spin();
       console.log('App: Spin result:', result);
       
       if (result.status === 'matched' && result.room) {

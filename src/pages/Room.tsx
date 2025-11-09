@@ -8,7 +8,7 @@ import { LivePreview } from '../components/LivePreview';
 import { HelpModal } from '../components/HelpModal';
 import { APIKeySettings } from '../components/APIKeySettings';
 import { ToastContainer, ToastType } from '../components/Toast';
-import { FileTree, FileNode } from '../components/FileTree';
+import { FileTree } from '../components/FileTree';
 import { EditorTabs, EditorTab } from '../components/EditorTabs';
 import { UserProfile } from '../components/UserProfile';
 import { vfs } from '../utils/virtualFileSystem';
@@ -114,9 +114,6 @@ const mapsAreEqual = (a: Map<string, string>, b: Map<string, string>) => {
 };
 
 export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: RoomProps) {
-  const [revealIdentity, setRevealIdentity] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string>();
-  const [isDeploying, setIsDeploying] = useState(false);
   const [currentCode, setCurrentCode] = useState('');
   const [aiCode, setAiCode] = useState<string>();
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -326,16 +323,6 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
     }, 5000);
   };
   
-  const handleDeploy = async () => {
-    setIsDeploying(true);
-    addToast('info', 'Building preview...');
-    
-    setTimeout(() => {
-      setPreviewUrl('https://example.com/preview');
-      setIsDeploying(false);
-      addToast('success', 'Preview deployed!');
-    }, 2000);
-  };
   
   const handleLeaveSession = async () => {
     const userId = getCurrentUserId();
@@ -865,7 +852,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                     >
                       <LivePreview 
                         code={currentCode} 
-                        loading={isDeploying}
+                        loading={false}
                         allFiles={allFiles}
                         onErrorDetected={(error) => {
                           console.log('Preview error detected:', error);

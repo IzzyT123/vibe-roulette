@@ -48,7 +48,7 @@ export default function App() {
   );
 }`;
 
-export function CodeEditor({ roomId, role, filePath, currentCode, onCodeChange, aiGeneratedCode }: CodeEditorProps) {
+export function CodeEditor({ role, filePath, currentCode, onCodeChange, aiGeneratedCode }: CodeEditorProps) {
   const [code, setCode] = useState(currentCode || STARTER_CODE);
   const [showAIIndicator, setShowAIIndicator] = useState(false);
   const [isMinimapEnabled, setIsMinimapEnabled] = useState(true);

@@ -97,7 +97,7 @@ export class VirtualFileSystem {
   private mapToTree(map: Map<string, any>): VirtualNode[] {
     const result: VirtualNode[] = [];
     
-    for (const [name, node] of map.entries()) {
+    for (const [, node] of map.entries()) {
       if (node.type === 'file') {
         result.push({
           path: node.path,

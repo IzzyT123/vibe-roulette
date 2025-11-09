@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import type { Room, Constraint } from '../types/contracts';
+import type { Constraint } from '../types/contracts';
 
 export interface Session {
   id: string;

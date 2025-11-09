@@ -28,7 +28,7 @@ function generateConstraints(): Room['constraints'] {
 
 // API endpoints
 export const api = {
-  async spin(anonMode: boolean, sessionLength: number = 10): Promise<Matchmaking> {
+  async spin(): Promise<Matchmaking> {
     const userId = getCurrentUserId();
     if (!userId) {
       throw new Error('User not authenticated');
@@ -75,7 +75,7 @@ export const api = {
       const session = await getSession(id);
       
       // Get user's role in this session
-      const { session: userSession, role } = await joinSession(id, userId);
+      const { role } = await joinSession(id, userId);
       
       const room: Room = {
         id: session.id,

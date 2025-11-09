@@ -46,10 +46,13 @@ export function subscribeToSessionFiles(
         filter: `session_id=eq.${sessionId}`,
       },
       (payload) => {
+        const newData = payload.new as any;
+        const oldData = payload.old as any;
+        
         console.log('Realtime file change received:', {
           eventType: payload.eventType,
-          filePath: payload.new?.file_path || payload.old?.file_path,
-          hasContent: !!(payload.new?.content)
+          filePath: newData?.file_path || oldData?.file_path,
+          hasContent: !!(newData?.content)
         });
         
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {

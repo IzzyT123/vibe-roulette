@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Loader2, Sparkles, Users, Rocket } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabase';
 import { getCurrentUserId } from '../utils/auth';
-import { getSession } from '../utils/sessionService';
 
 interface LobbyProps {
   onMatched: () => void;
@@ -11,7 +10,6 @@ interface LobbyProps {
 
 export function Lobby({ onMatched }: LobbyProps) {
   const [status, setStatus] = useState<'searching' | 'matched'>('searching');
-  const [sessionId, setSessionId] = useState<string | null>(null);
   
   // Get user's waiting session and subscribe to status changes
   useEffect(() => {
@@ -41,7 +39,6 @@ export function Lobby({ onMatched }: LobbyProps) {
         const sessionStatus = (participants[0] as any).sessions.status;
         
         console.log('Lobby: Found session:', userSessionId, 'status:', sessionStatus);
-        setSessionId(userSessionId);
 
         // If already active, match immediately
         if (sessionStatus === 'active') {

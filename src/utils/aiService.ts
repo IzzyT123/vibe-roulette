@@ -83,14 +83,14 @@ Return complete, working code that builds on previous conversation.`;
 
     // Use real API or mock based on config
     if (config.provider === 'mock' || !config.apiKey) {
-      return this.mockGenerateCode(userPrompt, language);
+      return this.mockGenerateCode(userPrompt);
     } else if (config.provider === 'openai') {
       return this.callOpenAI(systemPrompt, userPrompt, config);
     } else if (config.provider === 'anthropic') {
       return this.callAnthropic(systemPrompt, userPrompt, config);
     }
 
-    return this.mockGenerateCode(userPrompt, language);
+    return this.mockGenerateCode(userPrompt);
   }
 
   async chat(message: string, codeContext?: string): Promise<string> {
@@ -100,13 +100,13 @@ Return complete, working code that builds on previous conversation.`;
     let response: string;
     
     if (config.provider === 'mock' || !config.apiKey) {
-      response = await this.mockChat(message, codeContext);
+      response = await this.mockChat(message);
     } else if (config.provider === 'openai') {
       response = await this.chatOpenAI(message, codeContext, config);
     } else if (config.provider === 'anthropic') {
       response = await this.chatAnthropic(message, codeContext, config);
     } else {
-      response = await this.mockChat(message, codeContext);
+      response = await this.mockChat(message);
     }
     
     this.conversationHistory.push({ role: 'assistant', content: response });
@@ -205,7 +205,7 @@ CRITICAL RULES:
       if (error.includes('Unexpected token') || error.includes('expected')) {
         // Try to complete incomplete statements
         const lines = fixed.split('\n');
-        const fixedLines = lines.map((line, idx) => {
+        const fixedLines = lines.map((line) => {
           if (line.includes('setCount(co') || line.includes('setCount(co...')) {
             return line.replace(/setCount\(co[^)]*/, 'setCount(count + 1)');
           }
@@ -284,7 +284,7 @@ CRITICAL RULES:
   }
 
   // Mock implementations - Production-quality templates like Cursor/Bolt
-  private async mockGenerateCode(prompt: string, language: string): Promise<CodeGenerationResponse> {
+  private async mockGenerateCode(prompt: string): Promise<CodeGenerationResponse> {
     await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
     
     let code = '';
@@ -1394,7 +1394,7 @@ export default function App() {
     return { code, explanation };
   }
 
-  private async mockChat(message: string, codeContext?: string): Promise<string> {
+  private async mockChat(message: string): Promise<string> {
     await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
     
     const lowerMessage = message.toLowerCase();

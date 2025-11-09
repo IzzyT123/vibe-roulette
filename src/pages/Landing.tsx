@@ -8,7 +8,7 @@ import { ConfigureAIButton } from '../components/ConfigureAIButton';
 import { Zap, Sparkles } from 'lucide-react';
 
 interface LandingProps {
-  onSpin: (anonMode: boolean, sessionLength: number) => void;
+  onSpin: () => void;
 }
 
 export function Landing({ onSpin }: LandingProps) {
@@ -16,9 +16,12 @@ export function Landing({ onSpin }: LandingProps) {
   const [isSpinning, setIsSpinning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
+  // Keep anonMode state for future use, but don't pass to onSpin
+  console.log('Landing: Anonymous mode:', anonMode);
+  
   const handlePull = () => {
     setIsSpinning(true);
-    onSpin(anonMode, 0); // Session length no longer used
+    onSpin();
   };
   
   return (
