@@ -157,6 +157,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const approvalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastApprovalChangeId = useRef<string | null>(null);
+  const lastToastTime = useRef<Record<string, number>>({});
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -234,7 +235,13 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         setCurrentCode(change.content);
       }
 
-      addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
+      // Debounced toast notification - only show once every 3 seconds per file
+      const now = Date.now();
+      const lastToast = lastToastTime.current[change.filePath] || 0;
+      if (now - lastToast > 3000) {
+        addToast('info', `📝 ${change.filePath.split('/').pop()} updated by collaborator`);
+        lastToastTime.current[change.filePath] = now;
+      }
       
       // Reset flag after a brief delay to allow refreshFileSystem to complete
       setTimeout(() => {
