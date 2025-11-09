@@ -180,7 +180,6 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const lastApprovalChangeId = useRef<string | null>(null);
   const lastToastTime = useRef<Record<string, number>>({});
   const isBulkImportingRef = useRef(false);
-  const lastAINotificationTime = useRef<number>(0);
   
   // Load session files and chat history on mount
   useEffect(() => {
@@ -1169,12 +1168,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             console.error('Error syncing AI code:', error);
                           }
                           
-                          // Single notification (debounced)
-                          const now = Date.now();
-                          if (now - lastAINotificationTime.current > 5000) {
-                            addToast('success', 'AI generated code!');
-                            lastAINotificationTime.current = now;
-                          }
+                          // No notification - code appears directly in editor and preview
                         }}
                         onProjectGenerated={async (files) => {
                           // AI generated multiple files
@@ -1209,12 +1203,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                             setCurrentCode(mainFile.content);
                           }
                           
-                          // Single notification for all files (debounced)
-                          const now = Date.now();
-                          if (now - lastAINotificationTime.current > 5000) {
-                            addToast('success', `✨ AI created ${files.length} files!`);
-                            lastAINotificationTime.current = now;
-                          }
+                          // No notification - files appear in file tree and preview updates
                         }}
                       />
                     </motion.div>
@@ -1260,12 +1249,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
             console.error('Error syncing AI code:', error);
           }
           
-          // Single notification (debounced)
-          const now = Date.now();
-          if (now - lastAINotificationTime.current > 5000) {
-            addToast('success', 'AI generated code!');
-            lastAINotificationTime.current = now;
-          }
+          // No notification - code appears directly in editor and preview
         }}
       />
       
