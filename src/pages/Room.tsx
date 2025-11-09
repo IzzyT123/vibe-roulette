@@ -11,6 +11,7 @@ import { ToastContainer, ToastType } from '../components/Toast';
 import { FileTree } from '../components/FileTree';
 import { EditorTabs, EditorTab } from '../components/EditorTabs';
 import { UserProfile } from '../components/UserProfile';
+import { CodeApprovalModal } from '../components/CodeApprovalModal';
 import { vfs } from '../utils/virtualFileSystem';
 import { aiService } from '../utils/aiService';
 import { 
@@ -19,7 +20,15 @@ import {
   getSessionFiles,
   subscribeToSessionChat,
   sendChatMessage,
-  getSessionChatHistory
+  getSessionChatHistory,
+  updateTypingStatus,
+  subscribeToTypingStatus,
+  createCodeApproval,
+  approveCodeChange,
+  rejectCodeChange,
+  subscribeToCodeApprovals,
+  getPendingApprovals,
+  type CodeApproval
 } from '../utils/realtimeSync';
 import { getCurrentUserId } from '../utils/auth';
 import { leaveSession } from '../utils/sessionService';
@@ -141,6 +150,12 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   const [activeRightPanel, setActiveRightPanel] = useState<'preview' | 'ai'>('preview');
   const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
   
+  // Typing indicator and code approval state
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<CodeApproval | null>(null);
+  const [approvedCode, setApprovedCode] = useState<Map<string, string>>(new Map());
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Load session files and chat history on mount
   useEffect(() => {
     const loadSessionData = async () => {
@@ -250,6 +265,60 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
 
     return () => {
       unsubscribeChat();
+    };
+  }, [room.id]);
+
+  // Subscribe to typing indicators
+  useEffect(() => {
+    const unsubscribeTyping = subscribeToTypingStatus(room.id, (userId, isTyping) => {
+      const currentUserId = getCurrentUserId();
+      // Only show typing for partner, not self
+      if (userId !== currentUserId) {
+        setPartnerTyping(isTyping);
+      }
+    });
+
+    return () => {
+      unsubscribeTyping();
+    };
+  }, [room.id]);
+
+  // Subscribe to code approvals
+  useEffect(() => {
+    const loadPending = async () => {
+      const pending = await getPendingApprovals(room.id);
+      if (pending.length > 0) {
+        setPendingApproval(pending[0]); // Show first pending approval
+      }
+    };
+
+    loadPending();
+
+    const unsubscribeApprovals = subscribeToCodeApprovals(room.id, (approval) => {
+      if (approval.status === 'pending') {
+        setPendingApproval(approval);
+      } else if (approval.status === 'approved') {
+        // Both users approved - apply the code!
+        setPendingApproval(null);
+        vfs.setFile(approval.filePath, approval.codeContent);
+        refreshFileSystem();
+        
+        // Update approvedCode map to trigger preview update
+        setApprovedCode(prev => {
+          const next = new Map(prev);
+          next.set(approval.filePath, approval.codeContent);
+          return next;
+        });
+        
+        addToast('success', `✅ Code approved by both users!`);
+      } else if (approval.status === 'rejected') {
+        setPendingApproval(null);
+        addToast('info', '❌ Code change rejected');
+      }
+    });
+
+    return () => {
+      unsubscribeApprovals();
     };
   }, [room.id]);
 
@@ -501,6 +570,27 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
             </motion.div>
           )}
 
+          {partnerTyping && (
+            <motion.div
+              className="px-2 py-1 rounded text-xs flex items-center gap-1"
+              style={{
+                background: 'rgba(177, 107, 255, 0.2)',
+                color: 'var(--orchid-electric)',
+              }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+            >
+              <motion.span
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                ✨
+              </motion.span>
+              Vibing...
+            </motion.div>
+          )}
+
           <UserProfile compact />
         </div>
         
@@ -735,18 +825,32 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
               role={room.role}
               filePath={activeTab}
               currentCode={currentCode}
-              onCodeChange={(code) => {
+              onCodeChange={async (code) => {
                 setCurrentCode(code);
-                // Save to virtual file system
+                
+                // Emit typing indicator
+                updateTypingStatus(room.id, true);
+                
+                // Debounce typing indicator clear
+                if (typingTimeoutRef.current) {
+                  clearTimeout(typingTimeoutRef.current);
+                }
+                typingTimeoutRef.current = setTimeout(() => {
+                  updateTypingStatus(room.id, false);
+                }, 1000);
+                
+                // Save to virtual file system (local only, won't update preview yet)
                 vfs.setFile(activeTab, code);
                 
-                // Update allFiles Map to trigger preview update for local user
-                // Create a new Map with updated content for the active file
-                setAllFiles(prevFiles => {
-                  const newFiles = new Map(prevFiles);
-                  newFiles.set(activeTab, code);
-                  return newFiles;
-                });
+                // Create approval request if code is substantial enough
+                // (Skip for very small changes like single character edits)
+                if (code.trim().length > 10) {
+                  try {
+                    await createCodeApproval(room.id, activeTab, code);
+                  } catch (error) {
+                    console.error('Error creating approval:', error);
+                  }
+                }
               }}
               aiGeneratedCode={aiCode}
             />
@@ -860,7 +964,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
                       <LivePreview 
                         code={currentCode} 
                         loading={false}
-                        allFiles={allFiles}
+                        allFiles={approvedCode.size > 0 ? approvedCode : allFiles}
                         onErrorDetected={(error) => {
                           console.log('Preview error detected:', error);
                         }}
@@ -950,6 +1054,20 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+      
+      {/* Code Approval Modal */}
+      {pendingApproval && (
+        <CodeApprovalModal
+          approval={pendingApproval}
+          currentUserId={getCurrentUserId() || ''}
+          onApprove={async () => {
+            await approveCodeChange(room.id, pendingApproval.changeId);
+          }}
+          onReject={async () => {
+            await rejectCodeChange(room.id, pendingApproval.changeId);
+          }}
+        />
+      )}
     </div>
   );
 }

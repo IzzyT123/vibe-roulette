@@ -20,6 +20,20 @@ export interface ChatMessage {
 
 type FileChangeCallback = (change: FileChange) => void;
 type ChatMessageCallback = (message: ChatMessage) => void;
+type TypingStatusCallback = (userId: string, isTyping: boolean) => void;
+type CodeApprovalCallback = (approval: CodeApproval) => void;
+
+export interface CodeApproval {
+  id: string;
+  sessionId: string;
+  changeId: string;
+  filePath: string;
+  codeContent: string;
+  createdBy: string;
+  approvals: string[]; // Array of user IDs who approved
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
 
 /**
  * Subscribe to file changes for a session
@@ -269,5 +283,250 @@ export async function getSessionChatHistory(sessionId: string): Promise<ChatMess
     role: msg.role || 'user', // Default to 'user' for backwards compatibility
     createdAt: msg.created_at,
   })) as ChatMessage[];
+}
+
+/**
+ * Update typing status for a user
+ */
+export async function updateTypingStatus(
+  sessionId: string,
+  isTyping: boolean
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId || !isSupabaseConfigured()) return;
+
+  const { error } = await supabase
+    .from('session_typing')
+    .upsert(
+      {
+        session_id: sessionId,
+        user_id: userId,
+        is_typing: isTyping,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'session_id,user_id',
+      }
+    );
+
+  if (error) {
+    console.error('Error updating typing status:', error);
+  }
+}
+
+/**
+ * Subscribe to typing status changes
+ */
+export function subscribeToTypingStatus(
+  sessionId: string,
+  callback: TypingStatusCallback
+): () => void {
+  if (!isSupabaseConfigured()) {
+    return () => {};
+  }
+
+  const channel = supabase
+    .channel(`typing:${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'session_typing',
+        filter: `session_id=eq.${sessionId}`,
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const data = payload.new as any;
+          callback(data.user_id, data.is_typing);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Create a code approval request
+ */
+export async function createCodeApproval(
+  sessionId: string,
+  filePath: string,
+  codeContent: string
+): Promise<string> {
+  const userId = getCurrentUserId();
+  if (!userId) {
+    throw new Error('User not authenticated');
+  }
+
+  if (!isSupabaseConfigured()) {
+    return 'mock-change-id';
+  }
+
+  const changeId = `change-${Date.now()}`;
+
+  const { error } = await supabase.from('code_approvals').insert({
+    session_id: sessionId,
+    change_id: changeId,
+    file_path: filePath,
+    code_content: codeContent,
+    created_by: userId,
+    approvals: [userId], // Creator auto-approves
+    status: 'pending',
+  });
+
+  if (error) {
+    console.error('Error creating code approval:', error);
+    throw new Error(`Failed to create approval: ${error.message}`);
+  }
+
+  return changeId;
+}
+
+/**
+ * Approve a code change
+ */
+export async function approveCodeChange(
+  sessionId: string,
+  changeId: string
+): Promise<void> {
+  const userId = getCurrentUserId();
+  if (!userId || !isSupabaseConfigured()) return;
+
+  // Get current approval
+  const { data: approval, error: fetchError } = await supabase
+    .from('code_approvals')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('change_id', changeId)
+    .single();
+
+  if (fetchError || !approval) {
+    console.error('Error fetching approval:', fetchError);
+    return;
+  }
+
+  const approvals = approval.approvals || [];
+  if (!approvals.includes(userId)) {
+    approvals.push(userId);
+  }
+
+  // Check if we have 2 approvals (both users)
+  const status = approvals.length >= 2 ? 'approved' : 'pending';
+
+  const { error } = await supabase
+    .from('code_approvals')
+    .update({
+      approvals,
+      status,
+    })
+    .eq('session_id', sessionId)
+    .eq('change_id', changeId);
+
+  if (error) {
+    console.error('Error approving code:', error);
+  }
+}
+
+/**
+ * Reject a code change
+ */
+export async function rejectCodeChange(
+  sessionId: string,
+  changeId: string
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const { error } = await supabase
+    .from('code_approvals')
+    .update({ status: 'rejected' })
+    .eq('session_id', sessionId)
+    .eq('change_id', changeId);
+
+  if (error) {
+    console.error('Error rejecting code:', error);
+  }
+}
+
+/**
+ * Subscribe to code approval changes
+ */
+export function subscribeToCodeApprovals(
+  sessionId: string,
+  callback: CodeApprovalCallback
+): () => void {
+  if (!isSupabaseConfigured()) {
+    return () => {};
+  }
+
+  const channel = supabase
+    .channel(`approvals:${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'code_approvals',
+        filter: `session_id=eq.${sessionId}`,
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const data = payload.new as any;
+          const approval: CodeApproval = {
+            id: data.id,
+            sessionId: data.session_id,
+            changeId: data.change_id,
+            filePath: data.file_path,
+            codeContent: data.code_content,
+            createdBy: data.created_by,
+            approvals: data.approvals || [],
+            status: data.status,
+            createdAt: data.created_at,
+          };
+          callback(approval);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Get pending code approvals for a session
+ */
+export async function getPendingApprovals(sessionId: string): Promise<CodeApproval[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('code_approvals')
+    .select('*')
+    .eq('session_id', sessionId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching pending approvals:', error);
+    return [];
+  }
+
+  return (data || []).map((item) => ({
+    id: item.id,
+    sessionId: item.session_id,
+    changeId: item.change_id,
+    filePath: item.file_path,
+    codeContent: item.code_content,
+    createdBy: item.created_by,
+    approvals: item.approvals || [],
+    status: item.status,
+    createdAt: item.created_at,
+  })) as CodeApproval[];
 }
 
