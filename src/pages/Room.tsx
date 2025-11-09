@@ -457,7 +457,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
   }, [room.id]);
   */
 
-  // Sync file changes to Supabase (reduced debounce for real-time feel)
+  // Sync file changes to Supabase (debounced to avoid constant updates)
   useEffect(() => {
     if (isRemoteUpdateRef.current) {
       console.log('Skipping sync - remote update in progress');
@@ -485,7 +485,7 @@ export function Room({ room, onSessionEnd, onBrowseProjects, onSpinAgain }: Room
           setIsSyncing(false);
         }
       }
-    }, 200); // Reduced to 200ms for more real-time feel
+    }, 2000); // Increased to 2 seconds - only sync when user stops typing
 
     return () => {
       if (syncTimeoutRef.current) {
